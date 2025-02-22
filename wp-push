@@ -1,8 +1,8 @@
 #!/bin/bash
 
 script_version="1.0.1"
-# Author:       gb@wpnet.nz
-# Description:  Push / sync a site to another site, on the same server
+# Author:        gb@wpnet.nz
+# Description:   Push / sync a site to another site, on the same server
 # Requirements: - This script has some security risks, USE WITH CAUTION!
 #               - NEVER permit an untrusted user to run this script, or to have CLI access while
 #                 the elevated permissions are in effect.
@@ -12,9 +12,11 @@ script_version="1.0.1"
 #               - A separate script (run by root), creates the sudoers.d file, copies this script to
 #                 ~/.local/bin and prefills the names and paths
 #               - This script will NOT WORK unless enabled by an administrator beforehand
-#
-# Known issues: Probably won't work with sites that have the wp-config.php file above the webroot
-#               Not tested with installations that have webroot set as something other than 'files'
+# Known issues: - Probably won't work with sites that have the wp-config.php file above the webroot
+#               - Not tested with installations that have webroot set as something other than 'files'
+# TODO:         - Expermiment with using rsync instead of rm for 'sudo_as_dest_user' commands
+#                 (used for removing db dump files). Could then remove the rm permissions from the 
+#                 sudoers file, reducing scope granted to source_user
 
 ####################################################################################
 # EDIT FOLLOWING LINES ONLY!
