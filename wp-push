@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.0.1"
+script_version="1.0.1.3"
 # Author:        gb@wpnet.nz
 # Description:   Push / sync a site to another site, on the same server
 # Requirements: - This script has some security risks, USE WITH CAUTION!
@@ -26,14 +26,14 @@ script_version="1.0.1"
 ####################################################################################
 
 # SOURCE
-source_user="test1"
-source_path="/sites/test1.wpserver.nz/"         # use trailing slash
-source_webroot='files'                          # no preceding or trailing slash
+source_user=""
+source_path=""
+source_webroot=""
 
 # DESTINATION
-destination_user="test2"
-destination_path="/sites/test2.wpserver.nz/"    # use trailing slash
-destination_webroot='files'                     # no preceding or trailing slash
+destination_user=""
+destination_path=""
+destination_webroot=""
 
 ####################################################################################
 # NO MORE EDITING BELOW THIS LINE!
@@ -44,7 +44,7 @@ source_full_path="${source_path}${source_webroot}"
 destination_full_path="${destination_path}${destination_webroot}"
 destination_original_domain=$(basename "$destination_path")
 
-# Options flags (don't change here, pass in arguments on execution)
+# Options flags (don't change here, pass in arguments)
 exclude_wpconfig=1    # highly unlikely you want to change this
 do_search_replace=1   # run 'wp search-replace' on destination
 files_only=0          # don't do a database dump & import
