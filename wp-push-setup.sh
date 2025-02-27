@@ -1,5 +1,20 @@
 #!/bin/bash
 
+script_version="1.0.1"
+# Author:        gb@wpnet.nz
+# Description:   Configure sudoers and install a script to allow a "site user" to run a "wp-push" command
+
+#######################################################
+#### Set up
+#######################################################
+
+# wp-push installed filename
+install_name="wp-push"
+# Default webroot
+default_webroot="files"
+# wp-push script install location for "site" user
+install_dir=".local/bin"
+
 # Running in a terminal?
 tty -s && is_tty=1 || is_tty=0
 
@@ -40,11 +55,7 @@ function get_confirmation() {
     return 0
 }
 
-# Default webroot used by SpinupWP is "files"
-default_webroot="files"
-# wp-push script install location for "site" user
-install_dir=".local/bin"
-
+# Print instructions
 cat <<EOF
 
     This script will configure a sudoers file and local "wp-push" script for a SpinupWP "site" user (SOURCE).
@@ -87,16 +98,13 @@ else
 fi
 
 if ( get_confirmation "Use default webroot ($default_webroot) for user $source_user?" ); then
-
         if dir_exists "${source_path}${default_webroot}"; then
             source_webroot="$default_webroot"
         else
             echo "Invalid: '${source_path}${default_webroot}' not found!"
             exit 1
         fi
-
 else
-
     while true; do
         read -p "ENTER 'source_webroot' (no trailing slash, don't include the '${default_webroot}/' prefix): " source_webroot
         if dir_exists "${source_path}${default_webroot}/${source_webroot}"; then
@@ -105,7 +113,6 @@ else
         fi
         echo "Invalid path. Please try again."
     done
-
 fi
 
 cat <<EOF
@@ -150,7 +157,6 @@ if ( get_confirmation "Use default webroot ($default_webroot) for user $destinat
         echo "Invalid: '${destination_path}${default_webroot}' not found!"
         exit 1
     fi
-
 else
     while true; do
         read -p "ENTER 'destination_webroot' (no trailing slash, don't include the '${default_webroot}/' prefix): " destination_webroot
@@ -180,16 +186,19 @@ sudoers_file="/etc/sudoers.d/$sudoers_file"
 # only run config if same filename doesn't exist
 if [ ! -f "$sudoers_file" ]; then
 
+    # Check if existing sudoers config is OK, before we mess with it
+    echo "Checking sudo syntax with visudo ..."
+    if visudo -c; then
+        echo "Current sudoers syntax is correct."
+    elif ( get_confirmation "CHMOD all files in /etc/sudoers.d to 0440?" ); then
+        chmod 0440 /etc/sudoers.d/*
+    fi
     # Define the sudo rules
     sudo_rules="${source_user} ALL=(root) NOPASSWD: /usr/bin/setfacl, /usr/bin/rsync\n${source_user} ALL=(${destination_user}) NOPASSWD: /usr/bin/find, /usr/local/bin/wp"
 
     echo "Creating sudoers file at $sudoers_file"
     echo -e "$sudo_rules" > "$sudoers_file"
     chmod 0440 "$sudoers_file" # important!
-
-    if ( get_confirmation "CHMOD all files in /etc/sudoers.d to 0440?" ); then
-        chmod 0440 /etc/sudoers.d/*
-    fi
 
     # Verify the syntax using visudo -c -f
     if visudo -c -f "$sudoers_file" > /dev/null 2>&1; then
@@ -200,7 +209,6 @@ if [ ! -f "$sudoers_file" ]; then
         echo -e "\nSudoers configuration failed!"
         exit 1 # error
     fi
-
     echo -e "\nSudoers configuration complete."
 
 else
@@ -209,39 +217,49 @@ else
     if ( get_confirmation "Display existing sudoers file?" ); then
         cat $sudoers_file
     fi
-
     if ( ! get_confirmation "Keep existing sudoers file?" ); then
         rm -v "$sudoers_file"
-        if visudo -c > /dev/null 2>&1; then
+        echo "Checking sudo syntax with visudo ..."
+        # if visudo -c > /dev/null 2>&1; then
+        if visudo -c; then
             echo "Sudoers syntax is correct."
         else
             echo "ERROR: Sudoers syntax check failed! There may be a problem, check /etc/sudoers.d/"
-            exit 1 # error
         fi
+        echo -e "\nExiting ... you will need to re-run this script to create a new sudoers file."
+        exit
+    else
+        echo "Continuing with existing sudoers config ..."
     fi
-    # echo -e "\nExiting ... you can now re-run this script."
-    # exit 0
 
 fi
 
-if ( get_confirmation "Copy 'wp-push' script into '${source_path}/.local/bin/' ?" ); then
+#######################################################
+#### Configure & copy wp-push script for site user
+#######################################################
+if ( get_confirmation "Copy 'wp-push' script into '${source_path}${install_dir}' ?" ); then
 
     tmp_file=$(mktemp)
-    echo "Temporary file: $tmp_file"
+    echo "Creating temporary file: $tmp_file"
     cat ./wp-push > "$tmp_file"
-
     # Use sed to set the configuration
-    sed -i "s|source_user=\"\"|source_user=\"$source_user\"|" "$tmp_file"
-    sed -i "s|source_path=\"\"|source_path=\"$source_path\"|" "$tmp_file"
-    sed -i "s|source_webroot=\"\"|source_webroot=\"$source_webroot\"|" "$tmp_file"
+    echo "Writing config to file ..."
+    sed -i "/^source_user=/c\source_user=\"$source_user\"" "$tmp_file"
+    sed -i "/^source_path=/c\source_path=\"$source_path\"" "$tmp_file"
+    sed -i "/^source_webroot=/c\source_webroot=\"$source_webroot\"" "$tmp_file"
+    sed -i "/^destination_user=/c\destination_user=\"$destination_user\"" "$tmp_file"
+    sed -i "/^destination_path=/c\destination_path=\"$destination_path\"" "$tmp_file"
+    sed -i "/^destination_webroot=/c\destination_webroot=\"$destination_webroot\"" "$tmp_file"    
+    echo "Install and set permissions" 
+    mv $tmp_file "${source_path}${install_dir}/${install_name}"
+    chown ${source_user}:${source_user} "${source_path}${install_dir}/${install_name}"
+    chmod 0700 "${source_path}${install_dir}/${install_name}"
+    echo "Done! The user '${source_user}' can now login via SSH and run the '${install_name}' command."
 
-    sed -i "s|destination_user=\"\"|destination_user=\"$destination_user\"|" "$tmp_file"
-    sed -i "s|destination_path=\"\"|destination_path=\"$destination_path\"|" "$tmp_file"
-    sed -i "s|destination_webroot=\"\"|destination_webroot=\"$destination_webroot\"|" "$tmp_file"
+else
 
-    mv $tmp_file "${source_path}/${install_dir}/wp-push"
-    chown ${source_user}:${source_user} "${source_path}/${install_dir}/wp-push"
-    chmod 0700 "${source_path}/${install_dir}/wp-push"
+    echo "Cancelled! You will need to re-run the script to complete the configuration."
+    exit
 
 fi
 
