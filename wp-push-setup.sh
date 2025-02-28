@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.0.1"
+script_version="1.0.3"
 # Author:        gb@wpnet.nz
 # Description:   Configure sudoers and install a script to allow a "site user" to run a "wp-push" command
 
@@ -83,14 +83,15 @@ if [ -n "$source_home_path" ]; then
     if (get_confirmation "Home dir of user '$source_user' is: '$source_home_path'. Is this correct?"); then
         source_path="${source_home_path}/"
     else
-        while true; do
-            read -p "ENTER 'source_path' (no trailing slash): " source_path
-            if dir_exists "$source_path"; then
-                source_path="${source_path}/"
-                break
-            fi
-            echo "Invalid path. Please try again."
-        done
+        # while true; do
+        #     read -p "ENTER 'source_path' (no trailing slash): " source_path
+        #     if dir_exists "$source_path"; then
+        #         source_path="${source_path}/"
+        #         break
+        #     fi
+        #     echo "Invalid path. Please try again."
+        # done
+        echo "Cancelled" && exit 1
     fi
 else
     echo "User $source_user not found."
@@ -98,12 +99,12 @@ else
 fi
 
 if ( get_confirmation "Use default webroot ($default_webroot) for user $source_user?" ); then
-        if dir_exists "${source_path}${default_webroot}"; then
-            source_webroot="$default_webroot"
-        else
-            echo "Invalid: '${source_path}${default_webroot}' not found!"
-            exit 1
-        fi
+    if dir_exists "${source_path}${default_webroot}"; then
+        source_webroot="$default_webroot"
+    else
+        echo "Invalid: '${source_path}${default_webroot}' not found!"
+        exit 1
+    fi
 else
     while true; do
         read -p "ENTER 'source_webroot' (no trailing slash, don't include the '${default_webroot}/' prefix): " source_webroot
@@ -135,14 +136,15 @@ if [ -n "$destination_home_path" ]; then
     if (get_confirmation "Home dir of user '$destination_user' is: '$destination_home_path'. Is this correct?"); then
         destination_path="${destination_home_path}/"
     else
-        while true; do
-            read -p "Enter 'destination_path' (no trailing slash): " destination_path
-            if dir_exists "$destination_path"; then
-                destination_path="${destination_path}/"
-                break
-            fi
-            echo "Invalid path. Please try again."
-        done
+        # while true; do
+        #     read -p "Enter 'destination_path' (no trailing slash): " destination_path
+        #     if dir_exists "$destination_path"; then
+        #         destination_path="${destination_path}/"
+        #         break
+        #     fi
+        #     echo "Invalid path. Please try again."
+        # done
+        echo "Cancelled" && exit 1
     fi
 else
     echo "User $destination_user not found."

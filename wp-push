@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.2.0.0"
+script_version="1.3.0.0"
 # Author:        gb@wpnet.nz
 # Description:   Push / sync a site to another site, on the same server
 # Requirements: - This script has some security risks, USE WITH CAUTION!
@@ -9,11 +9,8 @@ script_version="1.2.0.0"
 #               - Requires a sudoers file at /etc/sudoers.d/ with permissions set accordingly
 #               - 'wp' must be available to the SOURCE and DESTINATION users
 #               - Does not use SSH, adding to authorized_keys is not required
-#               - A separate script (run by root), creates the sudoers.d file, copies this script to
-#                 ~/.local/bin and prefills the names and paths
-#               - This script will NOT WORK unless enabled by an administrator beforehand
-# Known issues: - Probably won't work with sites that have the wp-config.php file above the webroot
-#               - Not tested with installations that have webroot set as something other than 'files'
+#               - This script will NOT WORK unless appropriate permissions are enabled by an administrator beforehand
+# Known issues: - Won't work with sites that have the wp-config.php file above the webroot!
 
 ####################################################################################
 # EDIT FOLLOWING LINES ONLY!
@@ -284,7 +281,7 @@ if (( db_only == 0 )); then
     echo "++++ NOTE: Any files at DESTINATION not present in SOURCE will be DELETED!"
     echo "++++ EXCLUSIONS: ${excludes[@]}"
     (( be_verbose == 1 )) && quiet="" || quiet="--quiet"
-    sudo rsync ${quiet} -azhP --delete --chown=${destination_user}:${destination_user} $(printf -- "--exclude=%q " "${excludes[@]}") ${source_full_path} ${destination_path}
+    sudo rsync ${quiet} -azhP --delete --chown=${destination_user}:${destination_user} $(printf -- "--exclude=%q " "${excludes[@]}") ${source_full_path}/ ${destination_full_path} # slash after source_full_path is IMPORTANT!
 fi
 
 ####################################################################################
