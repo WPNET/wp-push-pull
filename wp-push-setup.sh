@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.0.4"
+script_version="1.0.5"
 # Author:        gb@wpnet.nz
 # Description:   Configure sudoers and install a script to allow a "site user" to run a "wp-push" command
 
@@ -179,7 +179,7 @@ EOF
 #### Define the SUDOERS file
 #######################################################
 
-sudoers_file="wp-push-${source_user}-${destination_user}"
+sudoers_file="${install_name}-${source_user}-${destination_user}"
 sudoers_file="/etc/sudoers.d/$sudoers_file"
 
 # only run config if same filename doesn't exist
@@ -240,7 +240,7 @@ if ( get_confirmation "Copy 'wp-push' script into '${source_path}${install_dir}'
 
     tmp_file=$(mktemp)
     echo "Creating temporary file: $tmp_file"
-    cat ./wp-push > "$tmp_file"
+    cat "./${install_name}.sh" > "$tmp_file"
     # Use sed to set the configuration
     echo "Writing config to file ..."
     sed -i "/^source_user=/c\source_user=\"$source_user\"" "$tmp_file"

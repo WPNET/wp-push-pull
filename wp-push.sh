@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.3.0.0"
+script_version="1.3.0.1"
 # Author:        gb@wpnet.nz
 # Description:   Push / sync a site to another site, on the same server
 # Requirements: - This script has some security risks, USE WITH CAUTION!
