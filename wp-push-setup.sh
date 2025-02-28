@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.0.3"
+script_version="1.0.4"
 # Author:        gb@wpnet.nz
 # Description:   Configure sudoers and install a script to allow a "site user" to run a "wp-push" command
 
@@ -63,11 +63,8 @@ cat <<EOF
     - Creates sudoers file at /etc/sudoers.d/
     - Populates the wp-push script with SOURCE & DESTINATION parameters
     - Copies the script into the user's ~/.local/bin/ directory
-    - SOURCE and DESTINATIONS users home directories and webroot will be estimated,
-      overrides can be provided. Entering incorrect paths that the user does not
-      have permissions for could result is bad juju. Don't do it.
-    - If a site's webroot is not default "files", enter as "my_sub_dir_weboot",
-      without preceding or trailing slash.
+    - Be sure to provide correct custom webroot paths if they are not default (files)
+    - If a site's webroot is not default, enter like: "public_html", without preceding or trailing slash.
 
 EOF
 
