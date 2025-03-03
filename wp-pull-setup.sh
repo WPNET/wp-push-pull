@@ -118,8 +118,8 @@ fi
 cat <<EOF
 
 REMOTE details:
-    remote_user:              $remote_user
-    remote_path/webroot:      ${remote_path}${remote_webroot}
+    remote_user:         $remote_user
+    remote_path/webroot: ${remote_path}${remote_webroot}
 
 EOF
 

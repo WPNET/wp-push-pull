@@ -105,19 +105,19 @@ function get_confirmation() {
 # (need to find a faster way to do this)
 function fetch_site_info() {
 
-    local_siteurl=$( wp option get siteurl --path=$local_full_path )
-    local_blogname=$( wp option get blogname --path=$local_full_path )
+    local_siteurl="$( wp option get siteurl --path=$local_full_path )"
+    local_blogname="$( wp option get blogname --path=$local_full_path )"
     local_db_name="$( wp config get DB_NAME --path=$local_full_path )"
-    local_db_prefix=$( wp db prefix --path=$local_full_path )
+    local_db_prefix="$( wp db prefix --path=$local_full_path )"
     local_site_domain=${local_siteurl#http://}
     local_site_domain=${local_siteurl#https://}
 
     remote_siteurl="$( sudo_as_remote_user wp option get siteurl --path=$remote_full_path )"
     remote_blogname="$( sudo_as_remote_user wp option get blogname --path=$remote_full_path )"
     remote_db_name="$( sudo_as_remote_user wp config get DB_NAME --path=$remote_full_path )"
-    remote_db_prefix=$( sudo_as_remote_user wp db prefix --path=$remote_full_path )
+    remote_db_prefix="$( sudo_as_remote_user wp db prefix --path=$remote_full_path )"
     remote_site_domain=${remote_siteurl#http://}
-    remote_site_domain=${remote_siteurl#https://
+    remote_site_domain=${remote_siteurl#https://}
 
 }
 
@@ -265,7 +265,7 @@ if [[ "$local_db_prefix" != $remote_db_prefix ]] && (( files_only == 0 )); then
             wp db reset --yes --path=$local_full_path
             # ALTERNATIVE: DROP only tables with the current table_prefix
             # wp db clean --yes --path=$local_full_path 
-            status -n "Updating the \$table_prefix in the LOCAL wp-config.php file ..."
+            status "Updating the \$table_prefix in the LOCAL wp-config.php file ..."
             wp config set table_prefix "${remote_db_prefix}" --path=$local_full_path
         else
             status "ABORTED!" && exit
