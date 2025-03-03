@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.0.0"
+script_version="1.0.1"
 # Author:        gb@wpnet.nz
 # Description:   Configure sudoers and install a script to allow a "site user" to run a "wp-pull" command
 
@@ -179,13 +179,11 @@ LOCAL details:
 
 EOF
 
-# PICK UP FROM HERE
-
 #######################################################
 #### Define the SUDOERS file
 #######################################################
 
-sudoers_file="${install_name}-${remote_user}-${local_user}"
+sudoers_file="${install_name}-${local_user}-${remote_user}"
 sudoers_file="/etc/sudoers.d/$sudoers_file"
 
 # only run config if same filename doesn't exist
@@ -199,7 +197,7 @@ if [ ! -f "$sudoers_file" ]; then
         chmod 0440 /etc/sudoers.d/*
     fi
     # Define the sudo rules
-    sudo_rules="${remote_user} ALL=(root) NOPASSWD: /usr/bin/setfacl, /usr/bin/rsync\n${remote_user} ALL=(${local_user}) NOPASSWD: /usr/bin/find, /usr/local/bin/wp"
+    sudo_rules="${local_user} ALL=(root) NOPASSWD: /usr/bin/setfacl, /usr/bin/rsync\n${local_user} ALL=(${remote_user}) NOPASSWD: /usr/bin/find, /usr/local/bin/wp"
 
     echo "Creating sudoers file at $sudoers_file"
     echo -e "$sudo_rules" > "$sudoers_file"
@@ -242,24 +240,24 @@ fi
 #######################################################
 #### Configure & copy wp-pull script for site user
 #######################################################
-if ( get_confirmation "Copy 'wp-pull' script into '${remote_path}${install_dir}' ?" ); then
+if ( get_confirmation "Copy 'wp-pull' script into '${local_path}${install_dir}' ?" ); then
 
     tmp_file=$(mktemp)
     echo "Creating temporary file: $tmp_file"
     cat "./${install_name}.sh" > "$tmp_file"
     # Use sed to set the configuration
     echo "Writing config to file ..."
+    sed -i "/^local_user=/c\local_user=\"$local_user\"" "$tmp_file"
+    sed -i "/^local_path=/c\local_path=\"$local_path\"" "$tmp_file"
+    sed -i "/^local_webroot=/c\local_webroot=\"$local_webroot\"" "$tmp_file"
     sed -i "/^remote_user=/c\remote_user=\"$remote_user\"" "$tmp_file"
     sed -i "/^remote_path=/c\remote_path=\"$remote_path\"" "$tmp_file"
     sed -i "/^remote_webroot=/c\remote_webroot=\"$remote_webroot\"" "$tmp_file"
-    sed -i "/^local_user=/c\local_user=\"$local_user\"" "$tmp_file"
-    sed -i "/^local_path=/c\local_path=\"$local_path\"" "$tmp_file"
-    sed -i "/^local_webroot=/c\local_webroot=\"$local_webroot\"" "$tmp_file"    
     echo "Install and set permissions" 
-    mv $tmp_file "${remote_path}${install_dir}/${install_name}"
-    chown ${remote_user}:${remote_user} "${remote_path}${install_dir}/${install_name}"
-    chmod 0700 "${remote_path}${install_dir}/${install_name}"
-    echo "Done! The user '${remote_user}' can now login via SSH and run the '${install_name}' command."
+    mv $tmp_file "${local_path}${install_dir}/${install_name}"
+    chown ${local_user}:${local_user} "${local_path}${install_dir}/${install_name}"
+    chmod 0700 "${local_path}${install_dir}/${install_name}"
+    echo "Done! The user '${local_user}' can now login via SSH and run the '${install_name}' command."
 
 else
 
