@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.3.0.1"
+script_version="1.3.0.2"
 # Author:        gb@wpnet.nz
 # Description:   Push / sync a site to another site, on the same server
 # Requirements: - This script has some security risks, USE WITH CAUTION!
@@ -344,7 +344,7 @@ if (( files_only == 0 && no_db_import == 0 )); then
             sudo_as_dest_user wp cache flush --hard --path=$destination_full_path
             echo -ne "${clr_yellow}NEW${clr_reset} DESTINATION blogname: "
             sudo_as_dest_user wp option get blogname --path=$destination_full_path
-            echo -ne "${clr_yellow}NEW${clr_reset} DESTINATION siteurl:  "
+            echo -ne "${clr_yellow}NEW${clr_reset} DESTINATION siteurl: "
             sudo_as_dest_user wp option get siteurl --path=$destination_full_path
         fi
     fi

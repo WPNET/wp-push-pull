@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.0.0.0"
+script_version="1.0.0.1"
 # Author:        gb@wpnet.nz
 # Description:   Pull a site from another site, on the same server
 # Requirements: - This script has some security risks, USE WITH CAUTION!
@@ -70,7 +70,6 @@ function status() {
 }
 
 # Set permissions for SOURCE user to access DESTINATION path (needed for find & wp)
-# SWAP?
 sudo /usr/bin/setfacl -m u:${remote_user}:rwX ${local_path}
 
 # Set DB dump filename, with random string and handle
@@ -288,43 +287,43 @@ if (( db_only == 0 )); then
     sudo rsync ${quiet} -azhP --delete --chown=${local_user}:${local_user} $(printf -- "--exclude=%q " "${excludes[@]}") ${remote_full_path}/ ${local_full_path} # slash after remote_full_path is IMPORTANT!
 fi
 
-# PICKUP FROM HERE
-
 ####################################################################################
-# DUMP the SOURCE database
+# DUMP the database from REMOTE
 ####################################################################################
 
 if (( files_only == 0 )); then
-    status "EXPORT database ... (${remote_db_name})"
-    wp db export ${remote_path}${db_dump_sql} --path=$remote_full_path
-    # RSYNC database dump to DESTINATION
-    (( be_verbose == 1 )) && status "COPY database to DESTINATION ..."
+    status "EXPORT REMOTE database ... (${remote_db_name})"
+    sudo_as_remote_user wp db export ${remote_path}${db_dump_sql} --path=$remote_full_path
+    # RSYNC database dump to LOCAL
+    (( be_verbose == 1 )) && status "COPY database to LOCAL ..."
     if sudo rsync --quiet -azhP --chown=${local_user}:${local_user} ${remote_path}${db_dump_sql} ${local_path}; then
-        status "SUCCESS Database copied to DESTINATION!"
+        status "SUCCESS Database copied to LOCAL!"
         (( be_verbose == 1 )) && status "Delete database dump source file ..."
-        rm ${verbose} ${remote_path}${db_dump_sql}
+        # rm ${verbose} ${remote_path}${db_dump_sql}
+        sudo_as_remote_user find "${remote_path}" -name "${db_dump_sql}" -delete 2>/dev/null
     else
-        status "ERROR: Database copy to DESTINATION failed!"
+        status "ERROR: Database copy to LOCAL failed!"
         exit
     fi
 fi
 
 ####################################################################################
-# IMPORT the database for the destination
+# IMPORT the database to LOCAL
 ####################################################################################
 
 if (( files_only == 0 && no_db_import == 0 )); then
     if ( get_confirmation "Proceed with IMPORT?"); then
-        status "IMPORT database to DESTINATION ..."
-        sudo_as_remote_user wp db import ${local_path}${db_dump_sql} --path=$local_full_path
+        status "IMPORT database to LOCAL ..."
+        wp db import ${local_path}${db_dump_sql} --path=$local_full_path
         status "DB IMPORT COMPLETE!"
-        sudo_as_remote_user wp cache flush --hard --path=$local_full_path
+        wp cache flush --hard --path=$local_full_path
         if (( be_verbose == 1 )); then
-            echo -n "New (TEMPORARY!) DESTINATION siteurl:  "
-            sudo_as_remote_user wp option get siteurl --path=$local_full_path
+            echo -n "New (TEMPORARY!) LOCAL siteurl:  "
+            wp option get siteurl --path=$local_full_path
         fi
         (( be_verbose == 1 )) && status "DELETE imported database source file ..."
-        sudo_as_remote_user find "${local_path}" -name "${db_dump_sql}" -delete 2>/dev/null
+        # sudo_as_remote_user find "${local_path}" -name "${db_dump_sql}" -delete 2>/dev/null
+        rm ${verbose} ${local_path}${db_dump_sql}
     else
         do_search_replace=0
     fi
@@ -341,20 +340,20 @@ if (( files_only == 0 && no_db_import == 0 )); then
                 newline="-n"; format="count"
             fi
             echo -e ${newline} "$lh EXECUTE 'wp search-replace' for URLs ... changed:${clr_reset} "
-            sudo_as_remote_user wp search-replace --precise //${remote_site_domain} //${local_original_domain} --path=$local_full_path --report-changed-only --format=${format}
+            wp search-replace --precise //${remote_site_domain} //${local_original_domain} --path=$local_full_path --report-changed-only --format=${format}
             echo -e ${newline} "$lh EXECUTE 'wp search-replace' for file PATHs ... changed:${clr_reset} "
-            sudo_as_remote_user wp search-replace --precise ${remote_full_path} ${local_full_path} --path=$local_full_path --report-changed-only --format=${format}
-            sudo_as_remote_user wp cache flush --hard --path=$local_full_path
-            echo -ne "${clr_yellow}NEW${clr_reset} DESTINATION blogname: "
-            sudo_as_remote_user wp option get blogname --path=$local_full_path
-            echo -ne "${clr_yellow}NEW${clr_reset} DESTINATION siteurl:  "
-            sudo_as_remote_user wp option get siteurl --path=$local_full_path
+            wp search-replace --precise ${remote_full_path} ${local_full_path} --path=$local_full_path --report-changed-only --format=${format}
+            wp cache flush --hard --path=$local_full_path
+            echo -ne "${clr_yellow}NEW${clr_reset} LOCAL blogname: "
+            wp option get blogname --path=$local_full_path
+            echo -ne "${clr_yellow}NEW${clr_reset} LOCAL siteurl: "
+            wp option get siteurl --path=$local_full_path
         fi
     fi
 
 fi
 
-# REMOVE the additional permissions from the SOURCE user
+# REMOVE the additional permissions from the REMOTE user
 sudo /usr/bin/setfacl -x u:${remote_user} ${local_path}
-status "PUSH completed!"
+status "PULL completed!"
 exit
