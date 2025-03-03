@@ -265,7 +265,7 @@ if [[ $source_db_prefix != "$destination_db_prefix" ]] && (( files_only == 0 ));
             sudo_as_dest_user wp db reset --yes --path=$destination_full_path
             # ALTERNATIVE: DROP only tables with the current table_prefix
             # sudo_as_dest_user wp db clean --yes --path=$destination_full_path 
-            status -n "Updating the \$table_prefix in the DESTINATION wp-config.php file ..."
+            status "Updating the \$table_prefix in the DESTINATION wp-config.php file ..."
             sudo_as_dest_user wp config set table_prefix "${source_db_prefix}" --path=$destination_full_path
         else
             status "ABORTED!" && exit
