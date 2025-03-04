@@ -1,16 +1,17 @@
 #!/bin/bash
 
-script_version="1.0.0.1"
-# Author:        gb@wpnet.nz
-# Description:   Pull a site from another site, on the same server
-# Requirements: - This script has some security risks, USE WITH CAUTION!
-#               - NEVER permit an untrusted user to run this script, or to have CLI access while
-#                 the elevated permissions are in effect.
-#               - Requires a sudoers file at /etc/sudoers.d/ with permissions set accordingly
-#               - 'wp' must be available to the REMOTE and LOCAL users
-#               - Does not use SSH, adding to authorized_keys is not required
-#               - This script will NOT WORK unless appropriate permissions are enabled by an administrator beforehand
-# Known issues: - Won't work with sites that have the wp-config.php file above the webroot!
+script_version="1.3.0.1"
+# Author:            gb@wpnet.nz
+# Description:       Pull a site from another site, on the same server
+# Requirements:      - This script has some security risks, USE WITH CAUTION!
+#                    - NEVER permit an untrusted user to run this script, or to have CLI access while
+#                      the elevated permissions are in effect.
+#                    - Requires a sudoers file at /etc/sudoers.d/ with permissions set accordingly
+#                    - 'wp' must be available to the REMOTE and LOCAL users
+#                    - Does not use SSH, adding to authorized_keys is not required
+#                    - This script will NOT WORK unless appropriate permissions are enabled by an administrator beforehand
+# Known limitations: - Unlikely to work with sites that have the wp-config.php file above the webroot!
+#                    - Untested with multisite
 
 ####################################################################################
 # EDIT FOLLOWING LINES ONLY!
@@ -147,13 +148,13 @@ EOF
 # Show help
 function show_help() {
 cat <<EOF
-    Usage: wp-push [OPTIONS] (v${script_version})
+    Usage: wp-pull [OPTIONS] (v${script_version})
         Options:
         --db-only                           Do not push files, only the database
         --files-only                        Do not push the database, only the files
-        --no-db-import                      Do not import the database on the destination
-        --no-search-replace, --no-rewrite   Do not run 'wp search-replace' on the destination
-        --tidy-up                           Delete database dump files in SOURCE and DESTINATION
+        --no-db-import                      Do not run 'wp db import'
+        --no-search-replace, --no-rewrite   Do not run 'wp search-replace'
+        --tidy-up                           Delete database dump files in LOCAL and REMOTE
         -h, --help                          Show this help message
         -v, --verbose                       Be verbose
         Notes:
