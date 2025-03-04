@@ -14,7 +14,7 @@
 ### Run a wp-push or wp-pull
 - Switch to the user that was defined as LOCAL during set up.
 - Run `wp-pull` or `wp-push`.
-- Follow the instructions to complete the site push / pull
+- Follow the instructions to complete the site push / pull.
 
 ### CLI Options
 
@@ -32,4 +32,4 @@
 ```
 
 ## Notes
-- Only tested on Ubuntu 20.04 & 22.04 so far
+- Only tested on Ubuntu 20.04 & 22.04 so far.
