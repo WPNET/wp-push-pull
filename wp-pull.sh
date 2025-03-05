@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.3.0.1"
+script_version="1.4.0.1"
 # Author:            gb@wpnet.nz
 # Description:       Pull a site from another site, on the same server
 # Requirements:      - This script has some security risks, USE WITH CAUTION!
@@ -38,10 +38,10 @@ local_original_domain=$(basename "$local_path")
 
 # Options flags (don't change here, pass in arguments)
 exclude_wpconfig=1    # highly unlikely you want to change this
-do_search_replace=1   # run 'wp search-replace' on destination
+do_search_replace=1   # run 'wp search-replace'
 files_only=0          # don't do a database dump & import
 db_only=0             # don't do a files sync
-no_db_import=0        # don't run db import on destination
+no_db_import=0        # don't run db import
 be_verbose=0          # be verbose
 
 # Add default excludes for rsync
@@ -70,20 +70,20 @@ function status() {
     echo -e "${lh} $@${clr_reset}"
 }
 
-# Set permissions for SOURCE user to access DESTINATION path (needed for find & wp)
+# Set permissions for REMOTE user to access LOCAL user's path (needed for find & wp)
 sudo /usr/bin/setfacl -m u:${remote_user}:rwX ${local_path}
 
 # Set DB dump filename, with random string and handle
-hash=$(echo $RANDOM | md5sum | head -c 12; echo;)
-hash_handle="48dsg"
+rnd_str=$(echo $RANDOM | md5sum | head -c 12; echo;)
+rnd_str_handle="48dsg"
 db_export_prefix="wp_db_export_"
-db_dump_sql="${db_export_prefix}${hash}${hash_handle}.sql"
+db_dump_sql="${db_export_prefix}${rnd_str}${rnd_str_handle}.sql"
 
 ####################################################################################
 # Functions
 ####################################################################################
 
-# run commands as local_user
+# run commands as REMOTE user
 function sudo_as_remote_user() {
     sudo -u $remote_user "$@"
 }
@@ -102,7 +102,7 @@ function get_confirmation() {
     return 0
 }
 
-# Get all SOURCE and DESTINATION site details
+# Get all LOCAL and REMOTE site details
 # (need to find a faster way to do this)
 function fetch_site_info() {
 
@@ -174,16 +174,16 @@ tidy_up_db_dumps() {
 
     status "TIDY UP: Search and delete database dump files ..."
     status "Found in LOCAL:"
-    find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${hash_handle}.sql" -print
+    find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print
     status "Found in REMOTE:"
-    find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${hash_handle}.sql" -print
+    find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print
 
-    if $(get_confirmation "DELETE any found database dump files?"); then
+    if $(get_confirmation "DELETE ALL found database dump files?"); then
         status "Deleting database dump files ..."
         # LOCAL
-        find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${hash_handle}.sql" -delete
+        find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete
         # REMOTE
-        find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${hash_handle}.sql" -delete
+        find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete
         status "Done!"
     else
         status "ABORTED!"
@@ -254,15 +254,15 @@ if ( ! get_confirmation "Proceed with PULL?" ); then
 fi
 
 ####################################################################################
-# CHECK WP table_prefixes match, if not reset DESTINATION database
+# CHECK WP table_prefixes match, if not reset LOCAL database
 ####################################################################################
 
-if [[ "$local_db_prefix" != $remote_db_prefix ]] && (( files_only == 0 )); then
+if [[ "$local_db_prefix" != "$remote_db_prefix" ]] && (( files_only == 0 )); then
     status "ERROR: LOCAL and REMOTE database prefixes do not match!"
-    status "To proceed, the LOCAL database will be RESET and the \$table_prefix in wp-config.php will be updated to match the REMOTE."
+    status "To proceed, the LOCAL database will be RESET and the \$table_prefix in wp-config.php will be changed to match REMOTE."
     if ( get_confirmation "Reset LOCAL site's database?" ) ; then
         if ( get_confirmation "WARNING! This will DELETE ALL tables in database: '${local_db_name}'! Not just those with table prefix '${local_db_prefix}'!" ) ; then
-            status "Resetting DESTINATION database ..."
+            status "Resetting LOCAL database ..."
             wp db reset --yes --path=$local_full_path
             # ALTERNATIVE: DROP only tables with the current table_prefix
             # wp db clean --yes --path=$local_full_path 
@@ -277,7 +277,7 @@ if [[ "$local_db_prefix" != $remote_db_prefix ]] && (( files_only == 0 )); then
 fi
 
 ####################################################################################
-# RSYNC files to DESTINATION
+# RSYNC files to LOCAL
 ####################################################################################
 
 if (( db_only == 0 )); then
@@ -289,7 +289,7 @@ if (( db_only == 0 )); then
 fi
 
 ####################################################################################
-# DUMP the database from REMOTE
+# DUMP the REMOTE database
 ####################################################################################
 
 if (( files_only == 0 )); then
@@ -299,8 +299,7 @@ if (( files_only == 0 )); then
     (( be_verbose == 1 )) && status "COPY database to LOCAL ..."
     if sudo rsync --quiet -azhP --chown=${local_user}:${local_user} ${remote_path}${db_dump_sql} ${local_path}; then
         status "SUCCESS Database copied to LOCAL!"
-        (( be_verbose == 1 )) && status "Delete database dump source file ..."
-        # rm ${verbose} ${remote_path}${db_dump_sql}
+        (( be_verbose == 1 )) && status "Delete database file ..."
         sudo_as_remote_user find "${remote_path}" -name "${db_dump_sql}" -delete 2>/dev/null
     else
         status "ERROR: Database copy to LOCAL failed!"
@@ -322,15 +321,14 @@ if (( files_only == 0 && no_db_import == 0 )); then
             echo -n "New (TEMPORARY!) LOCAL siteurl:  "
             wp option get siteurl --path=$local_full_path
         fi
-        (( be_verbose == 1 )) && status "DELETE imported database source file ..."
-        # sudo_as_remote_user find "${local_path}" -name "${db_dump_sql}" -delete 2>/dev/null
+        (( be_verbose == 1 )) && status "DELETE imported database file ..."
         rm ${verbose} ${local_path}${db_dump_sql}
     else
         do_search_replace=0
     fi
 
     ####################################################################################
-    # REWRITE the DB on the DESTINATION
+    # REWRITE the DB on LOCAL
     ####################################################################################
 
     if (( do_search_replace == 1 )); then
@@ -340,9 +338,9 @@ if (( files_only == 0 && no_db_import == 0 )); then
             else
                 newline="-n"; format="count"
             fi
-            echo -e ${newline} "$lh EXECUTE 'wp search-replace' for URLs ... changed:${clr_reset} "
+            echo -e ${newline} "$lh EXECUTE: 'wp search-replace' for URLs ... changed:${clr_reset} "
             wp search-replace --precise //${remote_site_domain} //${local_original_domain} --path=$local_full_path --report-changed-only --format=${format}
-            echo -e ${newline} "$lh EXECUTE 'wp search-replace' for file PATHs ... changed:${clr_reset} "
+            echo -e ${newline} "$lh EXECUTE: 'wp search-replace' for file PATHs ... changed:${clr_reset} "
             wp search-replace --precise ${remote_full_path} ${local_full_path} --path=$local_full_path --report-changed-only --format=${format}
             wp cache flush --hard --path=$local_full_path
             echo -ne "${clr_yellow}NEW${clr_reset} LOCAL blogname: "

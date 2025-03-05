@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.2.6"
+script_version="1.2.5"
 # Author:        gb@wpnet.nz
 # Description:   Configure sudoers and install script for wp-pull / wp-push command
 
@@ -57,7 +57,7 @@ function get_confirmation() {
 
 # Prompt for install type
 while true; do
-        read -p "Set up for 1 = wp-pull or 2 = wp-push? " install_type
+        read -p "Set up for 1 = wp-pull or 2 = wp-push?" install_type
         case "$install_type" in
             1) install_name="wp-pull"; break;;
             2) install_name="wp-push"; break;;
