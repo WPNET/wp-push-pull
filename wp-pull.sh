@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.4.0.1"
+script_version="1.4.0.2"
 # Author:            gb@wpnet.nz
 # Description:       Pull a site from another site, on the same server
 # Requirements:      - This script has some security risks, USE WITH CAUTION!
@@ -343,9 +343,9 @@ if (( files_only == 0 && no_db_import == 0 )); then
             echo -e ${newline} "$lh EXECUTE: 'wp search-replace' for file PATHs ... changed:${clr_reset} "
             wp search-replace --precise ${remote_full_path} ${local_full_path} --path=$local_full_path --report-changed-only --format=${format}
             wp cache flush --hard --path=$local_full_path
-            echo -ne "${clr_yellow}NEW${clr_reset} LOCAL blogname: "
+            echo -ne "${clr_yellow}LOCAL blogname:${clr_reset} "
             wp option get blogname --path=$local_full_path
-            echo -ne "${clr_yellow}NEW${clr_reset} LOCAL siteurl: "
+            echo -ne "${clr_yellow}LOCAL siteurl:${clr_reset} "
             wp option get siteurl --path=$local_full_path
         fi
     fi

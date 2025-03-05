@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.4.0.1"
+script_version="1.4.0.2"
 # Author:            gb@wpnet.nz
 # Description:       Push / sync a site to another site, on the same server
 # Requirements:      - This script has some security risks, USE WITH CAUTION!
@@ -343,9 +343,9 @@ if (( files_only == 0 && no_db_import == 0 )); then
             echo -e ${newline} "$lh EXECUTE: 'wp search-replace' for file PATHs ... changed:${clr_reset} "
             sudo_as_remote_user wp search-replace --precise ${local_full_path} ${remote_full_path} --path=$remote_full_path --report-changed-only --format=${format}
             sudo_as_remote_user wp cache flush --hard --path=$remote_full_path
-            echo -ne "${clr_yellow}NEW${clr_reset} REMOTE blogname: "
+            echo -ne "${clr_yellow}REMOTE blogname:${clr_reset} "
             sudo_as_remote_user wp option get blogname --path=$remote_full_path
-            echo -ne "${clr_yellow}NEW${clr_reset} REMOTE siteurl: "
+            echo -ne "${clr_yellow}REMOTE siteurl:${clr_reset} "
             sudo_as_remote_user wp option get siteurl --path=$remote_full_path
         fi
     fi
