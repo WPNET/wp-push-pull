@@ -32,4 +32,6 @@
 ```
 
 ## Notes
-- Only tested on Ubuntu 20.04 & 22.04 so far.
+- Untested with WPMU (multisite).
+- Only tested on Ubuntu 20.04 & 22.04. Should work on 24.04.
+- Won't work with sites that have the `wp-config.php` file above the webroot. (TODO)
