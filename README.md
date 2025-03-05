@@ -16,7 +16,7 @@
 - Run `wp-pull` or `wp-push`.
 - Follow the instructions to complete the site push / pull.
 
-### CLI Options
+### Options
 
 ```
  Options:
@@ -27,8 +27,6 @@
  --tidy-up                           Delete database dump files in SOURCE and DESTINATION
  -h, --help                          Show this help message
  -v, --verbose                       Be verbose
- Notes:
- - This script will NOT WORK unless enabled by an administrator beforehand. Contact support for assistance.
 ```
 
 ## Notes
