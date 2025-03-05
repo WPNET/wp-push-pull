@@ -22,9 +22,9 @@
  Options:
  --db-only                           Do not push files, only the database
  --files-only                        Do not push the database, only the files
- --no-db-import                      Do not import the database on the destination
- --no-search-replace, --no-rewrite   Do not run 'wp search-replace' on the destination
- --tidy-up                           Delete database dump files in SOURCE and DESTINATION
+ --no-db-import                      Do not run 'wp db import'
+ --no-search-replace, --no-rewrite   Do not run 'wp search-replace'
+ --tidy-up                           Delete database dump files in LOCAL and REMOTE
  -h, --help                          Show this help message
  -v, --verbose                       Be verbose
 ```
