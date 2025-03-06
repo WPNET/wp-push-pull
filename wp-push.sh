@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.4.0.2"
+script_version="1.4.0.4"
 # Author:            gb@wpnet.nz
 # Description:       Push / sync a site to another site, on the same server
 # Requirements:      - This script has some security risks, USE WITH CAUTION!
@@ -71,7 +71,7 @@ function status() {
 }
 
 # Set permissions for LOCAL user to access REMOTE user's path (needed for find & wp)
-sudo /usr/bin/setfacl -m u:${local_user}:rwX ${remote_path}
+# sudo /usr/bin/setfacl -m u:${local_user}:rwX ${remote_path}
 
 # Set DB dump filename, with random string and handle
 rnd_str=$(echo $RANDOM | md5sum | head -c 12; echo;)
@@ -176,14 +176,14 @@ tidy_up_db_dumps() {
     status "Found in LOCAL:"
     find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print
     status "Found in REMOTE:"
-    find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print
+    sudo_as_remote_user find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print
 
     if $(get_confirmation "DELETE ALL found database dump files?"); then
         status "Deleting database dump files ..."
         # LOCAL
         find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete
         # REMOTE
-        find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete
+        sudo_as_remote_user find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete
         status "Done!"
     else
         status "ABORTED!"
@@ -353,6 +353,6 @@ if (( files_only == 0 && no_db_import == 0 )); then
 fi
 
 # REMOVE the additional permissions from the LOCAL user
-sudo /usr/bin/setfacl -x u:${local_user} ${remote_path}
+# sudo /usr/bin/setfacl -x u:${local_user} ${remote_path}
 status "PUSH completed!"
 exit

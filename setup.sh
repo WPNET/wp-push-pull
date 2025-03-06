@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.2.6"
+script_version="1.2.7"
 # Author:        gb@wpnet.nz
 # Description:   Configure sudoers and install script for wp-pull / wp-push command
 
@@ -187,7 +187,8 @@ if [ ! -f "$sudoers_file" ]; then
         chmod 0440 /etc/sudoers.d/*
     fi
     # Define the sudo rules
-    sudo_rules="${local_user} ALL=(root) NOPASSWD: /usr/bin/setfacl, /usr/bin/rsync\n${local_user} ALL=(${remote_user}) NOPASSWD: /usr/bin/find, /usr/local/bin/wp"
+    # sudo_rules="${local_user} ALL=(root) NOPASSWD: /usr/bin/setfacl, /usr/bin/rsync\n${local_user} ALL=(${remote_user}) NOPASSWD: /usr/bin/find, /usr/local/bin/wp"
+    sudo_rules="${local_user} ALL=(root) NOPASSWD: /usr/bin/rsync\n${local_user} ALL=(${remote_user}) NOPASSWD: /usr/bin/find, /usr/local/bin/wp"
 
     echo "Creating sudoers file at $sudoers_file"
     echo -e "$sudo_rules" > "$sudoers_file"
