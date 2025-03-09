@@ -3,7 +3,7 @@
  
  Does not use SSH.
  
- **NOTE:** Use wp-pull in preference to wp-push, it requires less privileges and so is a bit safer.
+ **NOTE:** Use `wp-pull` in preference to `wp-push`, it requires less privileges and so is a bit safer.
 
 ## Usage
 ### Set up
