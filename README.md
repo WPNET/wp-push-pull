@@ -5,21 +5,23 @@
  
  `REMOTE` user: the user that "owns" the other site that will be pulled from, or pushed to.
  
- **NOTE:** Use `wp-pull` in preference to `wp-push`, it requires less privileges and so is a bit safer.
+ **NOTE:** `wp-pull` requires less elevated privileges than `wp-push`, use that wherever possible.
 
 ## Usage
 ### Set up
- - SSH into your server as a SUDO user.
- - Clone the repo to a local directory.
- - CD into the directory, `cd wp-push-pull`.
- - Run `sudo bash setup.sh`.
- - Follow the intructions to set up the required sudoer's file and copy the script for the LOCAL user.
- - During the set up you will be asked to specify whether you're setting up for `wp-push` or `wp-pull`.
+ - `SSH` into your server as a `sudo` user
+ - Clone the repo to a local directory: `git clone git@github.com:WPNET/wp-push-pull.git`
+ - CD into the directory, `cd wp-push-pull`
+ - Run `sudo bash setup.sh`
+ - Follow the intructions to set up the sudoer's file and copy the script for the `LOCAL` user
+ - During the set up you will be asked to specify whether you're setting up for `wp-push` or `wp-pull`
+ - **Use `wp-pull` in preference to `wp-push`**
 
-### Run a wp-push or wp-pull
-- Switch to the user that was defined as LOCAL during set up.
+### Run a `wp-push` or `wp-pull`
+- Login as the `LOCAL` user that was defined as during set up.
 - Run `wp-pull` or `wp-push`.
 - Follow the instructions to complete the site push / pull.
+- Run with `-h` for help.
 
 ### Options
 
