@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.4.0.4"
+script_version="1.4.3.0"
 # Author:            gb@wpnet.nz
 # Description:       Pull a site from another site, on the same server
 # Requirements:      - This script has some security risks, USE WITH CAUTION!
@@ -19,22 +19,24 @@ script_version="1.4.0.4"
 
 # LOCAL
 local_user=""
-local_path=""            # use trailing slash
-local_webroot=""         # no preceding or trailing slash
+local_path=""     # use trailing slash
+local_webroot=""  # no preceding or trailing slash
 
 # REMOTE
 remote_user=""
-remote_path=""           # use trailing slash
-remote_webroot=""        # no preceding or trailing slash
+remote_path=""    # use trailing slash
+remote_webroot="" # no preceding or trailing slash
 
 ####################################################################################
 # NO MORE EDITING BELOW THIS LINE!
 ####################################################################################
 
 # construct full paths
-remote_full_path="${remote_path}${remote_webroot}"
 local_full_path="${local_path}${local_webroot}"
-local_original_domain=$(basename "$local_path")
+remote_full_path="${remote_path}${remote_webroot}"
+local_original_siteurl="$( wp option get siteurl --path=$local_full_path )"
+local_original_domain=${local_original_siteurl#http://}
+local_original_domain=${local_original_siteurl#https://}
 
 # Options flags (don't change here, pass in arguments)
 exclude_wpconfig=1    # highly unlikely you want to change this
@@ -70,8 +72,8 @@ function status() {
     echo -e "${lh} $@${clr_reset}"
 }
 
-# Set permissions for REMOTE user to access LOCAL user's path (needed for find & wp)
-# sudo /usr/bin/setfacl -m u:${remote_user}:rwX ${local_path}
+# Set permissions for LOCAL user to access REMOTE user's path
+sudo /usr/bin/setfacl -m u:${local_user}:rwX ${remote_path}
 
 # Set DB dump filename, with random string and handle
 rnd_str=$(echo $RANDOM | md5sum | head -c 12; echo;)
@@ -110,15 +112,15 @@ function fetch_site_info() {
     local_blogname="$( wp option get blogname --path=$local_full_path )"
     local_db_name="$( wp config get DB_NAME --path=$local_full_path )"
     local_db_prefix="$( wp db prefix --path=$local_full_path )"
-    local_site_domain=${local_siteurl#http://}
-    local_site_domain=${local_siteurl#https://}
+    local_site_domain="${local_siteurl#http://}"
+    local_site_domain="${local_siteurl#https://}"
 
     remote_siteurl="$( sudo_as_remote_user wp option get siteurl --path=$remote_full_path )"
     remote_blogname="$( sudo_as_remote_user wp option get blogname --path=$remote_full_path )"
     remote_db_name="$( sudo_as_remote_user wp config get DB_NAME --path=$remote_full_path )"
     remote_db_prefix="$( sudo_as_remote_user wp db prefix --path=$remote_full_path )"
-    remote_site_domain=${remote_siteurl#http://}
-    remote_site_domain=${remote_siteurl#https://}
+    remote_site_domain="${remote_siteurl#http://}"
+    remote_site_domain="${remote_siteurl#https://}"
 
 }
 
@@ -176,14 +178,14 @@ tidy_up_db_dumps() {
     status "Found in LOCAL:"
     find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print
     status "Found in REMOTE:"
-    sudo_as_remote_user find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print
+    find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print 2>/dev/null
 
     if $(get_confirmation "DELETE ALL found database dump files?"); then
         status "Deleting database dump files ..."
         # LOCAL
         find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete
         # REMOTE
-        sudo_as_remote_user find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete
+        find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete 2>/dev/null
         status "Done!"
     else
         status "ABORTED!"
@@ -285,7 +287,7 @@ if (( db_only == 0 )); then
     echo "++++ NOTE: Any files at LOCAL not present in REMOTE will be DELETED!"
     echo "++++ EXCLUSIONS: ${excludes[@]}"
     (( be_verbose == 1 )) && quiet="" || quiet="--quiet"
-    sudo rsync ${quiet} -azhP --delete --chown=${local_user}:${local_user} $(printf -- "--exclude=%q " "${excludes[@]}") ${remote_full_path}/ ${local_full_path} # slash after remote_full_path is IMPORTANT!
+    rsync ${quiet} -azhP --delete --chown=${local_user}:${local_user} $(printf -- "--exclude=%q " "${excludes[@]}") ${remote_full_path}/ ${local_full_path} # slash after remote_full_path is IMPORTANT!
 fi
 
 ####################################################################################
@@ -297,10 +299,10 @@ if (( files_only == 0 )); then
     sudo_as_remote_user wp db export ${remote_path}${db_dump_sql} --path=$remote_full_path
     # RSYNC database dump to LOCAL
     (( be_verbose == 1 )) && status "COPY database to LOCAL ..."
-    if sudo rsync --quiet -azhP --chown=${local_user}:${local_user} ${remote_path}${db_dump_sql} ${local_path}; then
+    if rsync --quiet -azhP --chown=${local_user}:${local_user} ${remote_path}${db_dump_sql} ${local_path}; then
         status "SUCCESS Database copied to LOCAL!"
         (( be_verbose == 1 )) && status "Delete database file ..."
-        sudo_as_remote_user find "${remote_path}" -name "${db_dump_sql}" -delete 2>/dev/null
+        find "${remote_path}" -name "${db_dump_sql}" -delete 2>/dev/null
     else
         status "ERROR: Database copy to LOCAL failed!"
         exit
@@ -353,6 +355,6 @@ if (( files_only == 0 && no_db_import == 0 )); then
 fi
 
 # REMOVE the additional permissions from the REMOTE user
-# sudo /usr/bin/setfacl -x u:${remote_user} ${local_path}
+sudo /usr/bin/setfacl -x u:${local_user} ${remote_path}
 status "PULL completed!"
 exit
