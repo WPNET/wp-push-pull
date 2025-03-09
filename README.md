@@ -1,6 +1,7 @@
 # wp-push-pull
  A push/pull script for copying sites on a local server. 
  Does not use SSH.
+ Use wp-pull in preference to wp-push, it requires less privileges and so is a bit safer.
 
 ## Usage
 ### Set up
@@ -31,5 +32,5 @@
 
 ## Notes
 - Untested with WPMU (multisite).
-- Only tested on Ubuntu 20.04 & 22.04. Should work on 24.04.
+- Tested on Ubuntu 24.04.
 - Won't work with sites that have the `wp-config.php` file above the webroot. (TODO)
