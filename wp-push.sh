@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.4.3.0"
+script_version="1.4.4.0"
 # Author:            gb@wpnet.nz
 # Description:       Push / sync a site to another site, on the same server
 # Requirements:      - This script has some security risks, USE WITH CAUTION!
@@ -288,7 +288,8 @@ if (( db_only == 0 )); then
     echo "++++ NOTE: Any files at REMOTE not present in LOCAL will be DELETED!"
     echo "++++ EXCLUSIONS: ${excludes[@]}"
     (( be_verbose == 1 )) && quiet="" || quiet="--quiet"
-    rsync ${quiet} -azhP --delete --chown=${remote_user}:${remote_user} $(printf -- "--exclude=%q " "${excludes[@]}") ${local_full_path}/ ${remote_full_path} # slash after local_full_path is IMPORTANT!
+    # rsync to push to REMOTE must be run with sudo so file permissions and attrs are set correctly
+    sudo rsync ${quiet} -azhP --delete --chown=${remote_user}:${remote_user} $(printf -- "--exclude=%q " "${excludes[@]}") ${local_full_path}/ ${remote_full_path} # slash after local_full_path is IMPORTANT!
 fi
 
 ####################################################################################
@@ -300,7 +301,7 @@ if (( files_only == 0 )); then
     wp db export ${local_path}${db_dump_sql} --path=$local_full_path
     # RSYNC database dump to REMOTE
     (( be_verbose == 1 )) && status "COPY database to REMOTE ..."
-    if rsync --quiet -azhP --chown=${remote_user}:${remote_user} ${local_path}${db_dump_sql} ${remote_path}; then
+    if sudo rsync --quiet -azhP --chown=${remote_user}:${remote_user} ${local_path}${db_dump_sql} ${remote_path}; then
         status "SUCCESS Database copied to REMOTE!"
         (( be_verbose == 1 )) && status "Delete database file ..."
         rm ${verbose} ${local_path}${db_dump_sql}
