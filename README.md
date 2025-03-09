@@ -1,5 +1,12 @@
 # wp-push-pull
- A push/pull script for copying sites on a local server. Does not use SSH.
+
+ A push / pull script for copying sites on a **_local server_**.
+
+ This script:
+
+ - Does **not** copy sites to / from _remote servers_
+ - Does **not** use `ssh`
+ - Requires `wp-cli` installed on both `LOCAL` and `REMOTE` sites
 
  `LOCAL`  user: the user that will execute the `wp-pull` or `wp-push` script.
  
@@ -9,7 +16,7 @@
 
 ## Usage
 ### Set up
- - `SSH` into your server as a `sudo` user
+ - `ssh` into your server as a `sudo` user
  - Clone the repo to a local directory: `git clone git@github.com:WPNET/wp-push-pull.git`
  - CD into the directory, `cd wp-push-pull`
  - Run `sudo bash setup.sh`
