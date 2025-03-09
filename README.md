@@ -1,7 +1,9 @@
 # wp-push-pull
  A push/pull script for copying sites on a local server. 
+ 
  Does not use SSH.
- Use wp-pull in preference to wp-push, it requires less privileges and so is a bit safer.
+ 
+ **NOTE:** Use wp-pull in preference to wp-push, it requires less privileges and so is a bit safer.
 
 ## Usage
 ### Set up
