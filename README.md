@@ -2,6 +2,9 @@
  A push/pull script for copying sites on a local server. 
  
  Does not use SSH.
+
+ "LOCAL"  user: the user that will execute the `wp-pull` or `wp-push` script.
+ "REMOTE" user: the user that "owns" the other site that will be pulled from, or pushed to.
  
  **NOTE:** Use `wp-pull` in preference to `wp-push`, it requires less privileges and so is a bit safer.
 
