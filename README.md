@@ -1,6 +1,6 @@
 # wp-push-pull
 
- A push / pull script for copying sites on a **_local server_**.
+ A push / pull script for copying WordPress sites on a **_local server_**.
 
  This script:
 
