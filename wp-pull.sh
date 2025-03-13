@@ -47,7 +47,7 @@ no_db_import=0        # don't run db import
 be_verbose=0          # be verbose
 
 # Add default excludes for rsync
-excludes=(.wp-stats .maintenance .user.ini)
+excludes=(.wp-stats .maintenance .user.ini wp-content/cache)
 if (( exclude_wpconfig == 1 )); then
     excludes+=(wp-config.php)
 fi

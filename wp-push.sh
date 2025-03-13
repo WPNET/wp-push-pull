@@ -38,7 +38,6 @@ remote_original_siteurl="$( sudo -u $remote_user wp option get siteurl --path=$r
 remote_original_domain=${remote_original_siteurl#http://}
 remote_original_domain=${remote_original_siteurl#https://}
 
-
 # Options flags (don't change here, pass in arguments)
 exclude_wpconfig=1    # highly unlikely you want to change this
 do_search_replace=1   # run 'wp search-replace'
@@ -48,7 +47,7 @@ no_db_import=0        # don't run db import
 be_verbose=0          # be verbose
 
 # Add default excludes for rsync
-excludes=(.wp-stats .maintenance .user.ini)
+excludes=(.wp-stats .maintenance .user.ini wp-content/cache)
 if (( exclude_wpconfig == 1 )); then
     excludes+=(wp-config.php)
 fi
