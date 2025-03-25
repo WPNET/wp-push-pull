@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.2.10"
+script_version="1.2.11"
 # Author:        gb@wpnet.nz
 # Description:   Configure sudoers and install script for wp-pull / wp-push command
 
@@ -14,6 +14,10 @@ install_name=""
 default_webroot="files"
 # script install location for "site" user
 install_dir=".local/bin"
+# Get all users
+user_list=$(getent passwd)
+# Filter users matching "::/sites/"
+user_list=$(echo "$user_list" | grep "::/sites/")
 
 # Running in a terminal?
 tty -s && is_tty=1 || is_tty=0
@@ -84,16 +88,9 @@ EOF
 #######################################################
 
 echo
-# read -p "ENTER LOCAL username: " local_user
-
-# Get all users
-user_list=$(getent passwd)
-# Filter users matching "::/sites/"
-sites_users=$(echo "$user_list" | grep "::/sites/")
-
 # Extract usernames and display numbered list
 echo "Available users with /sites directories:"
-echo "$sites_users" | awk -F":" '{print NR ": " $1}'
+echo "$user_list" | awk -F":" '{print NR ": " $1}'
 
 while true; do
   # Prompt user for selection
@@ -106,7 +103,7 @@ while true; do
       ;;
     [0-9]*)
       # Extract selected username
-      local_user=$(echo "$sites_users" | awk -F":" "NR==$user_number {print \$1}")
+      local_user=$(echo "$user_list" | awk -F":" "NR==$user_number {print \$1}")
       # Check if a valid number was entered
       if [ -z "$local_user" ]; then
         echo "Invalid user. Please try again."
@@ -164,14 +161,12 @@ EOF
 #######################################################
 
 echo
-# Get all users
-user_list=$(getent passwd)
-# Filter users matching "::/sites/"
-sites_users=$(echo "$user_list" | grep "::/sites/" | grep -v "$local_user")
+# Filter the selected LOCAL user from the list
+user_list=$(echo "$user_list" | grep -v "$local_user")
 
 # Extract usernames and display numbered list
 echo "Available users with /sites directories:"
-echo "$sites_users" | awk -F":" '{print NR ": " $1}'
+echo "$user_list" | awk -F":" '{print NR ": " $1}'
 
 while true; do
   # Prompt user for selection
@@ -184,7 +179,7 @@ while true; do
       ;;
     [0-9]*)
       # Extract selected username
-      remote_user=$(echo "$sites_users" | awk -F":" "NR==$user_number {print \$1}")
+      remote_user=$(echo "$user_list" | awk -F":" "NR==$user_number {print \$1}")
       # Check if a valid number was entered
       if [ -z "$remote_user" ]; then
         echo "Invalid user. Please try again."
