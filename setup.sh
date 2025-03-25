@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.2.9"
+script_version="1.2.10"
 # Author:        gb@wpnet.nz
 # Description:   Configure sudoers and install script for wp-pull / wp-push command
 
@@ -84,7 +84,42 @@ EOF
 #######################################################
 
 echo
-read -p "ENTER LOCAL username: " local_user
+# read -p "ENTER LOCAL username: " local_user
+
+# Get all users
+user_list=$(getent passwd)
+# Filter users matching "::/sites/"
+sites_users=$(echo "$user_list" | grep "::/sites/")
+
+# Extract usernames and display numbered list
+echo "Available users with /sites directories:"
+echo "$sites_users" | awk -F":" '{print NR ": " $1}'
+
+while true; do
+  # Prompt user for selection
+  read -p "Select a LOCAL USER (c or x to cancel): " user_number
+
+  case "$user_number" in
+    c|x)
+      echo "Cancelled."
+      exit 1
+      ;;
+    [0-9]*)
+      # Extract selected username
+      local_user=$(echo "$sites_users" | awk -F":" "NR==$user_number {print \$1}")
+      # Check if a valid number was entered
+      if [ -z "$local_user" ]; then
+        echo "Invalid user. Please try again."
+      else
+        break
+      fi
+      ;;
+    *)
+      echo "Invalid input. Please enter a number, c, or x."
+      ;;
+  esac
+done
+
 local_home_path=$(getent passwd "$local_user" | cut -d: -f6)
 
 if [ -n "$local_home_path" ]; then
@@ -129,7 +164,40 @@ EOF
 #######################################################
 
 echo
-read -p "ENTER REMOTE username: " remote_user
+# Get all users
+user_list=$(getent passwd)
+# Filter users matching "::/sites/"
+sites_users=$(echo "$user_list" | grep "::/sites/" | grep -v "$local_user")
+
+# Extract usernames and display numbered list
+echo "Available users with /sites directories:"
+echo "$sites_users" | awk -F":" '{print NR ": " $1}'
+
+while true; do
+  # Prompt user for selection
+  read -p "Select a REMOTE USER (c or x to cancel): " user_number
+
+  case "$user_number" in
+    c|x)
+      echo "Cancelled."
+      exit 1
+      ;;
+    [0-9]*)
+      # Extract selected username
+      remote_user=$(echo "$sites_users" | awk -F":" "NR==$user_number {print \$1}")
+      # Check if a valid number was entered
+      if [ -z "$remote_user" ]; then
+        echo "Invalid user. Please try again."
+      else
+        break
+      fi
+      ;;
+    *)
+      echo "Invalid input. Please enter a number, c, or x."
+      ;;
+  esac
+done
+
 remote_home_path=$(getent passwd "$remote_user" | cut -d: -f6)
 
 if [ -n "$remote_home_path" ]; then
