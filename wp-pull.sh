@@ -354,7 +354,7 @@ if (( files_only == 0 && no_db_import == 0 )); then
 
 fi
 
-# REMOVE the additional permissions from the REMOTE user
+# REMOVE the additional permissions from the LOCAL user
 sudo /usr/bin/setfacl -x u:${local_user} ${remote_path}
 status "PULL completed!"
 exit
