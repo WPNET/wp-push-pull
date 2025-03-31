@@ -6,7 +6,7 @@
 
  - Does **not** copy sites to / from _remote servers_
  - Does **not** use `ssh`
- - Requires `wp-cli` installed on both `LOCAL` and `REMOTE` sites
+ - Requires `wp-cli` installed for both the `LOCAL` and `REMOTE` users
 
  `LOCAL`  user: the user that will execute the `wp-pull` or `wp-push` script.
  
