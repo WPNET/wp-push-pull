@@ -152,8 +152,8 @@ function show_help() {
 cat <<EOF
     Usage: wp-pull [OPTIONS] (v${script_version})
         Options:
-        --db-only                           Do not push files, only the database
-        --files-only                        Do not push the database, only the files
+        --db-only                           Do not pull files, only the database
+        --files-only                        Do not pull the database, only the files
         --no-db-import                      Do not run 'wp db import'
         --no-search-replace, --no-rewrite   Do not run 'wp search-replace'
         --tidy-up                           Delete database dump files in LOCAL and REMOTE
