@@ -1,17 +1,25 @@
 #!/bin/bash
 
-script_version="1.4.4.0"
+script_version="1.5.0.0"
 # Author:            gb@wpnet.nz
-# Description:       Push / sync a site to another site, on the same server
-# Requirements:      - This script has some security risks, USE WITH CAUTION!
-#                    - NEVER permit an untrusted user to run this script, or to have CLI access while
-#                      the elevated permissions are in effect.
-#                    - Requires a sudoers file at /etc/sudoers.d/ with permissions set accordingly
-#                    - 'wp' must be available to the LOCAL and REMOTE users
-#                    - Does not use SSH, adding to authorized_keys is not required
-#                    - This script will NOT WORK unless appropriate permissions are enabled by an administrator beforehand
-# Known limitations: - Unlikely to work with sites that have the wp-config.php file above the webroot!
-#                    - Untested with multisite
+# Description:       Push a WordPress site to another user on the same server
+# 
+# SECURITY WARNING:  This script has security implications - USE WITH CAUTION!
+#                    - NEVER permit an untrusted user to run this script
+#                    - NEVER leave elevated permissions in place after use
+#                    - Only use on local development/staging servers
+#                    - wp-push requires MORE elevated privileges than wp-pull
+#                    - PREFER using wp-pull over wp-push for better security
+#
+# Requirements:      - Requires a sudoers file at /etc/sudoers.d/ with appropriate permissions
+#                    - 'wp-cli' must be installed and available to both LOCAL and REMOTE users
+#                    - Does not use SSH or require authorized_keys configuration
+#                    - Must be configured by administrator using setup.sh before use
+#                    - Requires sudo access for rsync to set REMOTE file ownership
+#
+# Known limitations: - Will not work with wp-config.php located above the webroot
+#                    - Untested with WordPress multisite installations
+#                    - Only works for local server transfers (not remote servers)
 
 ####################################################################################
 # EDIT FOLLOWING LINES ONLY!
@@ -52,30 +60,63 @@ if (( exclude_wpconfig == 1 )); then
     excludes+=(wp-config.php)
 fi
 
-# Running in a terminal?
+# Detect if running in a terminal (for color support)
 tty -s && is_tty=1 || is_tty=0
 
-# BASH colors
+# BASH color codes for better output formatting
 if (( is_tty == 1 )); then
     clr_reset="\e[0m"
     clr_bold="\e[1m"
+    clr_red="\e[31m"
+    clr_green="\e[32m"
     clr_yellow="\e[33m"
+    clr_blue="\e[34m"
+    clr_cyan="\e[36m"
 else
+    # No colors if not in a terminal (e.g., logging to file)
     clr_reset=""
     clr_bold=""
+    clr_red=""
+    clr_green=""
     clr_yellow=""
+    clr_blue=""
+    clr_cyan=""
 fi
 
-# Set up a line header
+# Helper functions for consistent output formatting
 lh="\n${clr_bold}++++"
+
+# Standard status message (cyan)
 function status() {
-    echo -e "${lh} $@${clr_reset}"
+    echo -e "${lh} ${clr_cyan}$@${clr_reset}"
+}
+
+# Success message (green)
+function success() {
+    echo -e "${lh} ${clr_green}✓ $@${clr_reset}"
+}
+
+# Error message (red)
+function error() {
+    echo -e "${lh} ${clr_red}✗ ERROR: $@${clr_reset}"
+}
+
+# Warning message (yellow)
+function warning() {
+    echo -e "${lh} ${clr_yellow}⚠ WARNING: $@${clr_reset}"
+}
+
+# Info message (blue)
+function info() {
+    echo -e "${lh} ${clr_blue}ℹ $@${clr_reset}"
 }
 
 # Set permissions for LOCAL user to access REMOTE user's path
+# This allows LOCAL user to write files to REMOTE user's directory
 sudo /usr/bin/setfacl -m u:${local_user}:rwX ${remote_path}
 
-# Set DB dump filename, with random string and handle
+# Generate unique filename for database dumps
+# The random string helps avoid collisions and the handle helps with cleanup
 rnd_str=$(echo $RANDOM | md5sum | head -c 12; echo;)
 rnd_str_handle="48dsg"
 db_export_prefix="wp_db_export_"
@@ -85,9 +126,41 @@ db_dump_sql="${db_export_prefix}${rnd_str}${rnd_str_handle}.sql"
 # Functions
 ####################################################################################
 
-# run commands as REMOTE user
+# Execute wp-cli commands as REMOTE user
+# Suppresses stderr to avoid noisy permission/warning messages
 function sudo_as_remote_user() {
-    sudo -u $remote_user "$@"
+    if (( be_verbose == 1 )); then
+        # In verbose mode, show all output
+        sudo -u $remote_user "$@"
+    else
+        # In normal mode, suppress stderr noise from wp-cli
+        sudo -u $remote_user "$@" 2>/dev/null
+    fi
+}
+
+# Execute wp-cli commands as LOCAL user with error suppression
+function wp_quiet() {
+    if (( be_verbose == 1 )); then
+        # In verbose mode, show all output
+        wp "$@"
+    else
+        # In normal mode, suppress stderr noise from wp-cli
+        wp "$@" 2>/dev/null
+    fi
+}
+
+# Check if a command exists
+function command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Validate that wp-cli is available
+function check_wp_cli() {
+    if ! command_exists wp; then
+        error "wp-cli is not installed or not in PATH"
+        error "Please install wp-cli: https://wp-cli.org/"
+        exit 1
+    fi
 }
 
 # confirmation helper
@@ -104,23 +177,42 @@ function get_confirmation() {
     return 0
 }
 
-# Get all LOCAL and REMOTE site details
-# (need to find a faster way to do this)
+# Fetch WordPress site information from LOCAL and REMOTE installations
+# This gathers database names, URLs, and other critical configuration
+# Note: wp-cli commands can be slow; consider caching if performance is critical
 function fetch_site_info() {
+    
+    info "Fetching site information..."
+    
+    # Fetch LOCAL site details
+    local_siteurl="$( wp_quiet option get siteurl --path=$local_full_path )"
+    if [ -z "$local_siteurl" ]; then
+        error "Failed to get LOCAL site URL. Is WordPress installed at $local_full_path?"
+        exit 1
+    fi
+    
+    local_blogname="$( wp_quiet option get blogname --path=$local_full_path )"
+    local_db_name="$( wp_quiet config get DB_NAME --path=$local_full_path )"
+    local_db_prefix="$( wp_quiet db prefix --path=$local_full_path )"
+    
+    # Extract domain from URL (remove http:// or https://)
+    local_site_domain="${local_siteurl#http://}"
+    local_site_domain="${local_site_domain#https://}"
 
-    local_siteurl="$( wp option get siteurl --path=$local_full_path )"
-    local_blogname="$( wp option get blogname --path=$local_full_path )"
-    local_db_name="$( wp config get DB_NAME --path=$local_full_path )"
-    local_db_prefix="$( wp db prefix --path=$local_full_path )"
-    local_site_domain=${local_siteurl#http://}
-    local_site_domain=${local_siteurl#https://}
-
+    # Fetch REMOTE site details
     remote_siteurl="$( sudo_as_remote_user wp option get siteurl --path=$remote_full_path )"
+    if [ -z "$remote_siteurl" ]; then
+        error "Failed to get REMOTE site URL. Is WordPress installed at $remote_full_path?"
+        exit 1
+    fi
+    
     remote_blogname="$( sudo_as_remote_user wp option get blogname --path=$remote_full_path )"
     remote_db_name="$( sudo_as_remote_user wp config get DB_NAME --path=$remote_full_path )"
     remote_db_prefix="$( sudo_as_remote_user wp db prefix --path=$remote_full_path )"
-    remote_site_domain=${remote_siteurl#http://}
-    remote_site_domain=${remote_siteurl#https://}
+    
+    # Extract domain from URL
+    remote_site_domain="${remote_siteurl#http://}"
+    remote_site_domain="${remote_site_domain#https://}"
 
 }
 
@@ -171,24 +263,47 @@ function set_verbose() {
     verbose="-v"
 }
 
-# Tidy up database dump files
+# Clean up old database dump files
+# This helps maintain disk space by removing temporary export files
 tidy_up_db_dumps() {
-
-    status "TIDY UP: Search and delete database dump files ..."
-    status "Found in LOCAL:"
-    find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print
-    status "Found in REMOTE:"
-    find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print 2>/dev/null
-
-    if $(get_confirmation "DELETE ALL found database dump files?"); then
-        status "Deleting database dump files ..."
-        # LOCAL
-        find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete
-        # REMOTE
-        find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete 2>/dev/null
-        status "Done!"
+    
+    status "Searching for database dump files to clean up..."
+    
+    # Search LOCAL directory
+    info "Scanning LOCAL directory: ${local_path}"
+    local local_files=$(find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print 2>/dev/null)
+    if [ -n "$local_files" ]; then
+        echo "$local_files"
     else
-        status "ABORTED!"
+        echo "  No files found"
+    fi
+    
+    # Search REMOTE directory
+    info "Scanning REMOTE directory: ${remote_path}"
+    local remote_files=$(find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -print 2>/dev/null)
+    if [ -n "$remote_files" ]; then
+        echo "$remote_files"
+    else
+        echo "  No files found"
+    fi
+
+    # Confirm deletion if files found
+    if [ -n "$local_files" ] || [ -n "$remote_files" ]; then
+        if $(get_confirmation "DELETE ALL found database dump files?"); then
+            status "Deleting database dump files..."
+            
+            # Delete LOCAL files
+            local local_count=$(find "${local_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete -print 2>/dev/null | wc -l)
+            
+            # Delete REMOTE files
+            local remote_count=$(find "${remote_path}" -maxdepth 1 -name "${db_export_prefix}*${rnd_str_handle}.sql" -delete -print 2>/dev/null | wc -l)
+            
+            success "Cleanup complete! Deleted $local_count LOCAL and $remote_count REMOTE files."
+        else
+            warning "Cleanup cancelled by user"
+        fi
+    else
+        info "No database dump files found to clean up"
     fi
     exit 0
 }
@@ -236,126 +351,231 @@ if (( files_only == 1 && ( no_db_import == 1 || do_search_replace == 0 ) )); the
 fi
 
 ####################################################################################
-# Set up
+# Pre-flight checks and setup
 ####################################################################################
 
-# FETCH site(s) info
+# Check wp-cli is available
+check_wp_cli
+
+# Verify LOCAL path exists
+if [ ! -d "$local_full_path" ]; then
+    error "LOCAL path does not exist: $local_full_path"
+    exit 1
+fi
+
+# Verify REMOTE path exists
+if [ ! -d "$remote_full_path" ]; then
+    error "REMOTE path does not exist: $remote_full_path"
+    exit 1
+fi
+
+# Fetch site information from both LOCAL and REMOTE
 fetch_site_info
 
-# START output
-status "PUSH site FROM '${local_full_path}' TO '${remote_full_path}'"
+# Display operation banner
+echo ""
+echo -e "${clr_bold}${clr_cyan}═══════════════════════════════════════════════════════════════${clr_reset}"
+status "WordPress Site PUSH Operation"
+echo -e "${clr_bold}${clr_cyan}═══════════════════════════════════════════════════════════════${clr_reset}"
+warning "PUSH requires elevated privileges - USE WITH CAUTION!"
+info "FROM: ${local_user}@${local_full_path}"
+info "TO:   ${remote_user}@${remote_full_path}"
 (( be_verbose == 1 )) && echo "Script: $0 v${script_version}"
 
-# Print SUMMARY
+# Print detailed summary in verbose mode
 (( be_verbose == 1 )) && print_summary
 
-# CONFIRM before proceeding
+# Final confirmation before proceeding
 if ( ! get_confirmation "Proceed with PUSH?" ); then
-    status "ABORTED!"
-    exit
+    warning "Operation cancelled by user"
+    exit 0
 fi
 
 ####################################################################################
-# CHECK WP table_prefixes match, if not reset REMOTE database
+# Validate database table prefixes and handle mismatches
 ####################################################################################
 
 if [[ $local_db_prefix != "$remote_db_prefix" ]] && (( files_only == 0 )); then
-    status "ERROR: LOCAL and REMOTE database prefixes do not match!"
-    status "To proceed, the REMOTE database will be RESET and the \$table_prefix in wp-config.php will be changed to match LOCAL."
+    warning "Database table prefix mismatch detected!"
+    warning "LOCAL prefix:  ${local_db_prefix}"
+    warning "REMOTE prefix: ${remote_db_prefix}"
+    echo ""
+    warning "To proceed, the REMOTE database must be RESET and wp-config.php updated."
+    
     if ( get_confirmation "Reset REMOTE site's database?" ) ; then
-        if ( get_confirmation "WARNING! This will DELETE ALL tables in database: '${remote_db_name}'! Not just those with table prefix '${remote_db_prefix}'!" ) ; then
-            status "Resetting REMOTE database ..."
-            sudo_as_remote_user wp db reset --yes --path=$remote_full_path
-            # ALTERNATIVE: DROP only tables with the current table_prefix
-            # sudo_as_remote_user wp db clean --yes --path=$remote_full_path 
-            status "Updating the \$table_prefix in the REMOTE wp-config.php file ..."
-            sudo_as_remote_user wp config set table_prefix "${local_db_prefix}" --path=$remote_full_path
+        if ( get_confirmation "DANGER: This will DELETE ALL tables in database '${remote_db_name}'!" ) ; then
+            status "Resetting REMOTE database..."
+            if sudo_as_remote_user wp db reset --yes --path=$remote_full_path; then
+                success "Database reset complete"
+            else
+                error "Failed to reset database"
+                exit 1
+            fi
+            
+            status "Updating table_prefix in wp-config.php..."
+            if sudo_as_remote_user wp config set table_prefix "${local_db_prefix}" --path=$remote_full_path; then
+                success "Table prefix updated to: ${local_db_prefix}"
+            else
+                error "Failed to update table prefix"
+                exit 1
+            fi
         else
-            status "ABORTED!" && exit
+            warning "Operation cancelled - database prefix mismatch not resolved"
+            exit 0
         fi
     else    
-        status "ABORTED!" && exit
+        warning "Operation cancelled by user"
+        exit 0
     fi
 fi
 
 ####################################################################################
-# RSYNC files to REMOTE
+# Synchronize files from LOCAL to REMOTE using rsync
 ####################################################################################
 
 if (( db_only == 0 )); then
-    status "RSYNC files to REMOTE: ${remote_full_path} ..."
-    echo "++++ NOTE: Any files at REMOTE not present in LOCAL will be DELETED!"
-    echo "++++ EXCLUSIONS: ${excludes[@]}"
+    status "Synchronizing files from LOCAL to REMOTE..."
+    warning "Files at REMOTE not present in LOCAL will be DELETED!"
+    info "Excluded files/directories: ${excludes[@]}"
+    
+    # Set quiet mode based on verbosity
     (( be_verbose == 1 )) && quiet="" || quiet="--quiet"
-    # rsync to push to REMOTE must be run with sudo so file permissions and attrs are set correctly
-    sudo rsync ${quiet} -azhP --delete --chown=${remote_user}:${remote_user} $(printf -- "--exclude=%q " "${excludes[@]}") ${local_full_path}/ ${remote_full_path} # slash after local_full_path is IMPORTANT!
-fi
-
-####################################################################################
-# DUMP the LOCAL database
-####################################################################################
-
-if (( files_only == 0 )); then
-    status "EXPORT LOCAL database ... (${local_db_name})"
-    wp db export ${local_path}${db_dump_sql} --path=$local_full_path
-    # RSYNC database dump to REMOTE
-    (( be_verbose == 1 )) && status "COPY database to REMOTE ..."
-    if sudo rsync --quiet -azhP --chown=${remote_user}:${remote_user} ${local_path}${db_dump_sql} ${remote_path}; then
-        status "SUCCESS Database copied to REMOTE!"
-        (( be_verbose == 1 )) && status "Delete database file ..."
-        rm ${verbose} ${local_path}${db_dump_sql}
+    
+    # Perform rsync with sudo (required to set REMOTE file ownership)
+    # Trailing slash on source is critical for proper sync
+    if sudo rsync ${quiet} -azhP --delete --chown=${remote_user}:${remote_user} \
+        $(printf -- "--exclude=%q " "${excludes[@]}") \
+        ${local_full_path}/ ${remote_full_path}; then
+        success "File synchronization complete"
     else
-        status "ERROR: Database copy to REMOTE failed!"
-        exit
+        error "File synchronization failed (rsync error code: $?)"
+        exit 1
     fi
 fi
 
 ####################################################################################
-# IMPORT the database to REMOTE
+# Export LOCAL database and copy to REMOTE
+####################################################################################
+
+if (( files_only == 0 )); then
+    status "Exporting LOCAL database: ${local_db_name}"
+    
+    # Export database using wp-cli
+    if wp_quiet db export ${local_path}${db_dump_sql} --path=$local_full_path; then
+        success "Database export complete"
+    else
+        error "Failed to export LOCAL database"
+        exit 1
+    fi
+    
+    # Copy database dump file to REMOTE using rsync with sudo
+    (( be_verbose == 1 )) && info "Copying database file to REMOTE..."
+    if sudo rsync --quiet -azhP --chown=${remote_user}:${remote_user} \
+        ${local_path}${db_dump_sql} ${remote_path}; then
+        success "Database file copied to REMOTE"
+        
+        # Clean up LOCAL database dump file
+        (( be_verbose == 1 )) && info "Cleaning up LOCAL database file..."
+        rm ${verbose} ${local_path}${db_dump_sql}
+    else
+        error "Failed to copy database file to REMOTE"
+        # Try to clean up LOCAL file even on failure
+        rm -f ${local_path}${db_dump_sql}
+        exit 1
+    fi
+fi
+
+####################################################################################
+# Import database to REMOTE WordPress installation
 ####################################################################################
 
 if (( files_only == 0 && no_db_import == 0 )); then
-    if ( get_confirmation "Proceed with IMPORT?"); then
-        status "IMPORT database to REMOTE ..."
-        sudo_as_remote_user wp db import ${remote_path}${db_dump_sql} --path=$remote_full_path
-        status "DB IMPORT COMPLETE!"
-        sudo_as_remote_user wp cache flush --hard --path=$remote_full_path
-        if (( be_verbose == 1 )); then
-            echo -n "New (TEMPORARY!) REMOTE siteurl:  "
-            sudo_as_remote_user wp option get siteurl --path=$remote_full_path
+    if ( get_confirmation "Proceed with database import?"); then
+        status "Importing database to REMOTE..."
+        
+        # Import the database dump
+        if sudo_as_remote_user wp db import ${remote_path}${db_dump_sql} --path=$remote_full_path; then
+            success "Database import complete!"
+        else
+            error "Database import failed"
+            exit 1
         fi
-        (( be_verbose == 1 )) && status "DELETE imported database file ..."
+        
+        # Flush WordPress cache
+        sudo_as_remote_user wp cache flush --hard --path=$remote_full_path 2>/dev/null
+        
+        if (( be_verbose == 1 )); then
+            info "Temporary REMOTE siteurl: $(sudo_as_remote_user wp option get siteurl --path=$remote_full_path)"
+        fi
+        
+        # Clean up database dump file
+        (( be_verbose == 1 )) && info "Cleaning up database file..."
         find "${remote_path}" -name "${db_dump_sql}" -delete 2>/dev/null
     else
+        warning "Database import skipped - search-replace will not run"
         do_search_replace=0
     fi
 
     ####################################################################################
-    # REWRITE the DB on the REMOTE
+    # Update database URLs and paths (search-replace)
     ####################################################################################
 
     if (( do_search_replace == 1 )); then
-        if ( get_confirmation "Proceed with database rewrites? (this could take a while ...)" ); then
+        if ( get_confirmation "Proceed with database URL/path updates? (may take a while...)" ); then
+            
+            # Set output format based on verbosity
             if (( be_verbose == 1 )); then
                 newline=""; format="table"
             else
                 newline="-n"; format="count"
             fi
-            echo -e ${newline} "$lh EXECUTE: 'wp search-replace' for URLs ... changed:${clr_reset} "
-            sudo_as_remote_user wp search-replace --precise //${local_site_domain} //${remote_original_domain} --path=$remote_full_path --report-changed-only --format=${format}
-            echo -e ${newline} "$lh EXECUTE: 'wp search-replace' for file PATHs ... changed:${clr_reset} "
-            sudo_as_remote_user wp search-replace --precise ${local_full_path} ${remote_full_path} --path=$remote_full_path --report-changed-only --format=${format}
-            sudo_as_remote_user wp cache flush --hard --path=$remote_full_path
-            echo -ne "${clr_yellow}REMOTE blogname:${clr_reset} "
-            sudo_as_remote_user wp option get blogname --path=$remote_full_path
-            echo -ne "${clr_yellow}REMOTE siteurl:${clr_reset} "
-            sudo_as_remote_user wp option get siteurl --path=$remote_full_path
+            
+            # Replace URLs (domain names)
+            status "Updating URLs in database..."
+            echo -e ${newline} "${lh} ${clr_blue}Replacing URLs: //${local_site_domain} → //${remote_original_domain}${clr_reset}"
+            if sudo_as_remote_user wp search-replace --precise "//${local_site_domain}" "//${remote_original_domain}" \
+                --path=$remote_full_path --report-changed-only --format=${format}; then
+                success "URL replacement complete"
+            else
+                warning "URL replacement may have encountered issues"
+            fi
+            
+            # Replace file paths
+            status "Updating file paths in database..."
+            echo -e ${newline} "${lh} ${clr_blue}Replacing paths: ${local_full_path} → ${remote_full_path}${clr_reset}"
+            if sudo_as_remote_user wp search-replace --precise "${local_full_path}" "${remote_full_path}" \
+                --path=$remote_full_path --report-changed-only --format=${format}; then
+                success "Path replacement complete"
+            else
+                warning "Path replacement may have encountered issues"
+            fi
+            
+            # Flush cache after search-replace
+            sudo_as_remote_user wp cache flush --hard --path=$remote_full_path 2>/dev/null
+            
+            # Display final site configuration
+            echo ""
+            success "Site configuration updated:"
+            echo -e "  ${clr_cyan}Blogname:${clr_reset} $(sudo_as_remote_user wp option get blogname --path=$remote_full_path)"
+            echo -e "  ${clr_cyan}Site URL:${clr_reset} $(sudo_as_remote_user wp option get siteurl --path=$remote_full_path)"
+        else
+            warning "Database URL/path updates skipped"
         fi
     fi
 
 fi
 
-# REMOVE the additional permissions from the LOCAL user
-sudo /usr/bin/setfacl -x u:${local_user} ${remote_path}
-status "PUSH completed!"
-exit
+####################################################################################
+# Cleanup and completion
+####################################################################################
+
+# Remove temporary elevated permissions
+(( be_verbose == 1 )) && info "Removing temporary file access permissions..."
+sudo /usr/bin/setfacl -x u:${local_user} ${remote_path} 2>/dev/null
+
+# Display completion message
+echo ""
+echo -e "${clr_bold}${clr_green}═══════════════════════════════════════════════════════════════${clr_reset}"
+success "PUSH operation completed successfully!"
+echo -e "${clr_bold}${clr_green}═══════════════════════════════════════════════════════════════${clr_reset}"
+exit 0
