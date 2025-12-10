@@ -161,8 +161,10 @@ EOF
 #######################################################
 
 echo
-# Filter the selected LOCAL user from the list
-user_list=$(echo "$user_list" | grep -v "$local_user")
+# Filter the selected LOCAL user from the list (using awk to match username field only)
+# Note: awk -v passes $local_user as a string, so $1 != user does string comparison (not regex)
+# This is safe even if username contains special characters like dots or brackets
+user_list=$(echo "$user_list" | awk -F":" -v user="$local_user" '$1 != user')
 
 # Extract usernames and display numbered list
 echo "Available users with /sites directories:"
