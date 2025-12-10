@@ -60,20 +60,14 @@ if (( is_tty == 1 )); then
     clr_reset="\e[0m"
     clr_bold="\e[1m"
     clr_yellow="\e[33m"
-    clr_green="\e[32m"
-    clr_cyan="\e[36m"
-    clr_red="\e[31m"
 else
     clr_reset=""
     clr_bold=""
     clr_yellow=""
-    clr_green=""
-    clr_cyan=""
-    clr_red=""
 fi
 
 # Set up a line header
-lh="\n${clr_bold}${clr_cyan}++++"
+lh="\n${clr_bold}++++"
 function status() {
     echo -e "${lh} $@${clr_reset}"
 }
