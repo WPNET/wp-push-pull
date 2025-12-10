@@ -1,8 +1,10 @@
 #!/bin/bash
 
-script_version="1.2.11"
+script_version="1.3.0"
 # Author:        gb@wpnet.nz
-# Description:   Configure sudoers and install script for wp-pull / wp-push command
+# Description:   Setup script for wp-pull / wp-push commands
+#                Configures sudoers permissions and installs wrapper scripts
+#                Must be run as root or with sudo privileges
 
 #######################################################
 #### Set up
@@ -19,19 +21,45 @@ user_list=$(getent passwd)
 # Filter users matching "::/sites/"
 user_list=$(echo "$user_list" | grep "::/sites/")
 
-# Running in a terminal?
+# Detect if running in a terminal (for color support)
 tty -s && is_tty=1 || is_tty=0
 
-# BASH colors
+# BASH color codes for better output formatting
 if (( is_tty == 1 )); then
     clr_reset="\e[0m"
     clr_bold="\e[1m"
+    clr_red="\e[31m"
+    clr_green="\e[32m"
     clr_yellow="\e[33m"
+    clr_blue="\e[34m"
+    clr_cyan="\e[36m"
 else
+    # No colors if not in a terminal
     clr_reset=""
     clr_bold=""
+    clr_red=""
+    clr_green=""
     clr_yellow=""
+    clr_blue=""
+    clr_cyan=""
 fi
+
+# Helper functions for consistent output
+function success() {
+    echo -e "${clr_green}✓ $@${clr_reset}"
+}
+
+function error() {
+    echo -e "${clr_red}✗ ERROR: $@${clr_reset}"
+}
+
+function warning() {
+    echo -e "${clr_yellow}⚠ WARNING: $@${clr_reset}"
+}
+
+function info() {
+    echo -e "${clr_blue}ℹ $@${clr_reset}"
+}
 
 # check a directory exists
 dir_exists() {
@@ -59,27 +87,52 @@ function get_confirmation() {
     return 0
 }
 
-# Prompt for install type
-while true; do
-        read -p "Set up for 1 = wp-pull or 2 = wp-push? " install_type
-        case "$install_type" in
-            1) install_name="wp-pull"; break;;
-            2) install_name="wp-push"; break;;
-            *) echo "Invalid choice. Please try again.";;
-        esac
-    done
+# Display setup banner
+echo ""
+echo -e "${clr_bold}${clr_cyan}═══════════════════════════════════════════════════════════════${clr_reset}"
+echo -e "${clr_bold}${clr_cyan}     WordPress Push/Pull Setup - Configuration Wizard${clr_reset}"
+echo -e "${clr_bold}${clr_cyan}═══════════════════════════════════════════════════════════════${clr_reset}"
+echo ""
 
-# Print instructions
+# Prompt for install type
+info "Select operation type:"
+echo "  1 = wp-pull (recommended - safer, requires fewer privileges)"
+echo "  2 = wp-push (use only when pull is not feasible)"
+echo ""
+while true; do
+    read -p "Enter choice [1 or 2]: " install_type
+    case "$install_type" in
+        1) 
+            install_name="wp-pull"
+            success "Selected: wp-pull (recommended)"
+            break
+            ;;
+        2) 
+            install_name="wp-push"
+            warning "Selected: wp-push (requires elevated privileges)"
+            break
+            ;;
+        *) 
+            error "Invalid choice. Please enter 1 or 2."
+            ;;
+    esac
+done
+
+# Print setup instructions
+echo ""
+info "Setup Overview:"
 cat <<EOF
 
-    This script will configure a sudoers file and local "${install_name}" script for a non-sudo "site" user
-    - Creates sudoers file at /etc/sudoers.d/
-    - Populates the ${install_name} script with LOCAL & REMOTE parameters
-    - Copies the script into the LOCAL user's ~/.local/bin/ directory
-    - Be sure to provide correct custom webroot paths if they are not default (i.e. 'files')
-    - If a site's webroot is not default, enter only the custom directory, e.g. "public_html", without preceding or trailing slash
-    - LOCAL user:  The user (and \$HOME path) who will run the script
-    - REMOTE user: The user (and \$HOME path) from where the site will be pushed / pulled
+    This wizard will:
+    • Create a sudoers file at /etc/sudoers.d/
+    • Configure ${install_name} script with LOCAL & REMOTE parameters
+    • Copy the script into LOCAL user's ~/.local/bin/ directory
+    
+    Important notes:
+    • LOCAL user:  The user who will run the ${install_name} command
+    • REMOTE user: The user who owns the source/target WordPress site
+    • Default webroot is 'files' - adjust if your setup differs
+    • Custom webroot: enter directory name only (e.g., 'public_html')
 
 EOF
 
