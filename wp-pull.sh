@@ -81,7 +81,7 @@ else
 fi
 
 # Helper functions for consistent output formatting
-lh="\n${clr_bold}++++"
+lh="\n${clr_bold}"
 
 # Standard status message (cyan)
 function status() {
