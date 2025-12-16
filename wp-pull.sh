@@ -41,7 +41,7 @@ local_full_path="${local_path}${local_webroot}"
 remote_full_path="${remote_path}${remote_webroot}"
 local_original_siteurl="$( wp option get siteurl --path=$local_full_path )"
 local_original_domain=${local_original_siteurl#http://}
-local_original_domain=${local_original_siteurl#https://}
+local_original_domain=${local_original_domain#https://}
 
 # Options flags (don't change here, pass in arguments)
 exclude_wpconfig=1    # highly unlikely you want to change this
@@ -370,7 +370,6 @@ fi
 fetch_site_info
 
 # Display operation banner
-echo ""
 echo -e "${clr_bold}${clr_cyan}═══════════════════════════════════════════════════════════════${clr_reset}"
 status "WordPress Site PULL Operation"
 echo -e "${clr_bold}${clr_cyan}═══════════════════════════════════════════════════════════════${clr_reset}"

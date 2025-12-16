@@ -44,7 +44,7 @@ local_full_path="${local_path}${local_webroot}"
 remote_full_path="${remote_path}${remote_webroot}"
 remote_original_siteurl="$( sudo -u $remote_user wp option get siteurl --path=$remote_full_path )"
 remote_original_domain=${remote_original_siteurl#http://}
-remote_original_domain=${remote_original_siteurl#https://}
+remote_original_domain=${remote_original_domain#https://}
 
 # Options flags (don't change here, pass in arguments)
 exclude_wpconfig=1    # highly unlikely you want to change this
@@ -373,7 +373,6 @@ fi
 fetch_site_info
 
 # Display operation banner
-echo ""
 echo -e "${clr_bold}${clr_cyan}═══════════════════════════════════════════════════════════════${clr_reset}"
 status "WordPress Site PUSH Operation"
 echo -e "${clr_bold}${clr_cyan}═══════════════════════════════════════════════════════════════${clr_reset}"
