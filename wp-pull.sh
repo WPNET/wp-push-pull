@@ -59,7 +59,7 @@ files_only=0          # don't do a database dump & import
 db_only=0             # don't do a files sync
 no_db_import=0        # don't run db import
 be_verbose=0          # be verbose
-all_tables=0          # use --all-tables flag for search-replace
+all_tables_with_prefix=0          # use --all-tables-with-prefix flag for search-replace
 
 # Add default excludes for rsync
 excludes=(.wp-stats .maintenance .user.ini wp-content/cache)
@@ -258,7 +258,7 @@ cat <<EOF
         --no-search-replace, --no-rewrite   Do not run 'wp search-replace'
         --tidy-up                           Delete database dump files in LOCAL and REMOTE
         -e, --exclude 'path1 path2'         Additional paths to exclude from rsync (space-delimited, quoted)
-        -a, --all-tables                    Use --all-tables flag for wp search-replace commands
+        -a, --all-tables-with-prefix        Use --all-tables-with-prefix flag for wp search-replace commands
         -h, --help                          Show this help message
         -v, --verbose                       Be verbose
         Notes:
@@ -356,8 +356,8 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       ;;
-    --all-tables|-a)
-      all_tables=1
+    --all-tables-with-prefix|-a)
+      all_tables_with_prefix=1
       shift;;
     *)
       echo "Invalid option: $1" >&2
@@ -553,11 +553,11 @@ if (( files_only == 0 && no_db_import == 0 )); then
                 newline="-n"; format="count"
             fi
             
-            # Set --all-tables flag if requested
-            if (( all_tables == 1 )); then
-                all_tables_flag="--all-tables"
+            # Set --all-tables-with-prefix flag if requested
+            if (( all_tables_with_prefix == 1 )); then
+                all_tables_with_prefix_flag="--all-tables-with-prefix"
             else
-                all_tables_flag=""
+                all_tables_with_prefix_flag=""
             fi
             
             # Replace URLs (domain names)
@@ -567,7 +567,7 @@ if (( files_only == 0 && no_db_import == 0 )); then
                 status "Updating URLs in database (with protocol conversion)..."
                 echo -e ${newline} "${lh} ${clr_blue}Replacing URLs: ${remote_protocol}${remote_site_domain} → ${local_original_protocol}${local_site_domain}${clr_reset}"
                 if wp_quiet search-replace --precise "${remote_protocol}${remote_site_domain}" "${local_original_protocol}${local_site_domain}" \
-                    --path=$local_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
+                    --path=$local_full_path --report-changed-only --format=${format} ${all_tables_with_prefix_flag}; then
                     success "URL replacement complete (protocol converted)"
                 else
                     warning "URL replacement may have encountered issues"
@@ -577,7 +577,7 @@ if (( files_only == 0 && no_db_import == 0 )); then
                 status "Updating URLs in database..."
                 echo -e ${newline} "${lh} ${clr_blue}Replacing URLs: //${remote_site_domain} → //${local_site_domain}${clr_reset}"
                 if wp_quiet search-replace --precise "//${remote_site_domain}" "//${local_site_domain}" \
-                    --path=$local_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
+                    --path=$local_full_path --report-changed-only --format=${format} ${all_tables_with_prefix_flag}; then
                     success "URL replacement complete"
                 else
                     warning "URL replacement may have encountered issues"
@@ -588,7 +588,7 @@ if (( files_only == 0 && no_db_import == 0 )); then
             status "Updating file paths in database..."
             echo -e ${newline} "${lh} ${clr_blue}Replacing paths: ${remote_full_path} → ${local_full_path}${clr_reset}"
             if wp_quiet search-replace --precise "${remote_full_path}" "${local_full_path}" \
-                --path=$local_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
+                --path=$local_full_path --report-changed-only --format=${format} ${all_tables_with_prefix_flag}; then
                 success "Path replacement complete"
             else
                 warning "Path replacement may have encountered issues"
