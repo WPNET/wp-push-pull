@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.5.0.0"
+script_version="1.5.1.0"
 # Author:            gb@wpnet.nz
 # Description:       Pull a WordPress site from another user on the same server
 # 
