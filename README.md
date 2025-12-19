@@ -23,6 +23,8 @@ A powerful and secure solution for copying WordPress sites between users on the 
 
 These scripts enable safe and efficient WordPress site transfers between different system users on a local server. They use `wp-cli`, `rsync`, and carefully controlled `sudo` permissions to handle both files and databases.
 
+**Understanding LOCAL vs REMOTE**: Throughout this documentation, **LOCAL** refers to YOU (the user running the command), and **REMOTE** refers to the OTHER user's site. When you run `wp-pull`, you're pulling FROM the REMOTE user TO yourself (LOCAL). When you run `wp-push`, you're pushing FROM yourself (LOCAL) TO the REMOTE user.
+
 ### Key Features
 
 - ✅ **Safe local transfers** - Copy sites between users on the same server
@@ -88,11 +90,14 @@ The setup wizard will guide you through:
    - `wp-push` - Push sites to another user
    - Security note: wp-pull requires fewer elevated privileges
 
-2. **Select LOCAL user** - The user who will run the command
+2. **Select LOCAL user** - The user who will run the command (YOU)
+   - This is YOUR user account that will execute the wp-pull/wp-push command
    - Displays numbered list of users with `/sites` directories
    - Validates home directory existence
 
-3. **Select REMOTE user** - The user who owns the source/target site
+3. **Select REMOTE user** - The OTHER user whose site you're syncing with
+   - For wp-pull: this is the user you're copying FROM
+   - For wp-push: this is the user you're copying TO
    - Automatically excludes LOCAL user from selection
    - Validates home directory existence
 
@@ -125,11 +130,14 @@ The wizard will:
 
 ### 3. Running a Pull/Push
 
+**Important**: You must be logged in as the LOCAL user (the one who will execute the command).
+
 ```bash
-# Login as the LOCAL user
+# Login as the LOCAL user (YOU)
 ssh local-user@your-server
 
-# Run the pull command (if configured for wp-pull)
+# Run wp-pull to copy FROM the REMOTE user TO yourself (LOCAL)
+# Direction: REMOTE (their site) → LOCAL (your site)
 wp-pull
 
 # Or run with options
@@ -139,12 +147,36 @@ wp-pull --files-only       # Only sync files
 wp-pull -h                 # Show help
 ```
 
+**Visual flow for wp-pull**:
+```
+┌──────────────────┐           ┌──────────────────┐
+│  REMOTE User     │  ─────>   │   LOCAL User     │
+│  (Their site)    │  PULL     │   (Your site)    │
+│  (Source)        │           │   (Destination)  │
+└──────────────────┘           └──────────────────┘
+```
+
 ## 📖 Detailed Usage
 
 ### Terminology
 
-- **LOCAL user**: The user executing the `wp-pull` or `wp-push` command
-- **REMOTE user**: The user who owns the source (pull) or target (push) WordPress site
+Understanding LOCAL vs REMOTE:
+
+- **LOCAL user**: **Always** the user who runs the command (YOU)
+  - For `wp-pull`: You are pulling FROM the REMOTE user TO yourself (LOCAL)
+  - For `wp-push`: You are pushing FROM yourself (LOCAL) TO the REMOTE user
+  - LOCAL = "my site" or "the site I'm working on"
+  - The script runs under your LOCAL user account
+
+- **REMOTE user**: **Always** the other user (NOT YOU)
+  - For `wp-pull`: The REMOTE user owns the source site you're copying FROM
+  - For `wp-push`: The REMOTE user owns the target site you're copying TO
+  - REMOTE = "their site" or "the other site"
+  - The script accesses their files using sudo permissions
+
+**Simple Rule**: LOCAL = whoever is typing the command. REMOTE = the other person's site.
+
+Other terms:
 - **Protocol**: The URL scheme (http or https) used by the WordPress site
 - **Table prefix**: The database table prefix defined in `wp-config.php` (e.g., `wp_`, `wpmu_`)
 
@@ -216,15 +248,16 @@ Removes old database dump files from both LOCAL and REMOTE directories to free u
 
 #### Example 1: Complete site migration with protocol change
 ```bash
-# Scenario: Production uses https, development uses http
-# REMOTE: https://production.example.com (table prefix: wp_)
-# LOCAL:  http://dev.example.com (table prefix: wp_)
+# Scenario: You (developer) want to copy from production user
+# REMOTE (their site): https://production.example.com (table prefix: wp_)
+# LOCAL (your site):   http://dev.example.com (table prefix: wp_)
 
+# You run as LOCAL user:
 wp-pull
 
 # Output shows:
-# ℹ FROM: production@/var/www/production
-# ℹ TO:   developer@/var/www/dev
+# ℹ FROM: production@/var/www/production (REMOTE - their site)
+# ℹ TO:   developer@/var/www/dev (LOCAL - your site)
 # ✓ Protocol preservation: https → http conversion applied
 # ✓ URL replacement complete (protocol converted)
 # ✓ Site URL: http://dev.example.com
@@ -232,17 +265,17 @@ wp-pull
 
 #### Example 2: Handling table prefix mismatch
 ```bash
-# Scenario: REMOTE site uses wpmu_ prefix, LOCAL uses wp_
+# Scenario: Their site (REMOTE) uses wpmu_, your site (LOCAL) uses wp_
 wp-pull
 
 # Script detects mismatch and prompts:
 # ⚠ WARNING: Database table prefix mismatch detected!
-# ⚠ WARNING: LOCAL prefix:  wp_
-# ⚠ WARNING: REMOTE prefix: wpmu_
+# ⚠ WARNING: LOCAL prefix (yours):  wp_
+# ⚠ WARNING: REMOTE prefix (theirs): wpmu_
 # 
 # After confirmation:
-# ✓ Database reset complete
-# ✓ Table prefix updated to: wpmu_
+# ✓ Database reset complete (your LOCAL database)
+# ✓ Table prefix updated to: wpmu_ (your LOCAL wp-config.php)
 # ✓ Database import complete!
 ```
 
@@ -309,31 +342,33 @@ The system consists of two main components:
 
 ### Operation Flow (wp-pull)
 
+**Remember**: LOCAL = YOU (running the command), REMOTE = the OTHER user's site
+
 ```
 1. Pre-flight checks
-   └─→ Verify paths exist
+   └─→ Verify paths exist (both LOCAL and REMOTE)
    └─→ Check wp-cli availability
    └─→ Fetch site information (URLs, database names, table prefixes)
    └─→ Display summary and request confirmation
 
 2. Validate database compatibility
    └─→ Detect table prefix mismatches
-   └─→ Offer to reset LOCAL database if needed
+   └─→ Offer to reset LOCAL (your) database if needed
    └─→ Update wp-config.php with correct prefix
 
 3. Grant temporary permissions
-   └─→ Use ACL to allow LOCAL user to read REMOTE files
+   └─→ Use ACL to allow LOCAL user (you) to read REMOTE files (theirs)
 
 4. Sync files (if not --db-only)
-   └─→ rsync from REMOTE to LOCAL
+   └─→ rsync from REMOTE (their site) to LOCAL (your site)
    └─→ Apply custom and default exclusions
    └─→ Preserve ownership and permissions
    └─→ Delete files not present in REMOTE
 
 5. Database operations (if not --files-only)
-   └─→ Export REMOTE database (with stderr suppression)
-   └─→ Copy to LOCAL
-   └─→ Import to LOCAL (with confirmation)
+   └─→ Export REMOTE database (their database, with stderr suppression)
+   └─→ Copy to LOCAL (your location)
+   └─→ Import to LOCAL (your database, with confirmation)
    └─→ Detect protocol differences (http vs https)
    └─→ Search-replace URLs with protocol awareness
    └─→ Search-replace file paths
