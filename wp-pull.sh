@@ -40,8 +40,17 @@ remote_webroot="" # no preceding or trailing slash
 local_full_path="${local_path}${local_webroot}"
 remote_full_path="${remote_path}${remote_webroot}"
 local_original_siteurl="$( wp option get siteurl --path=$local_full_path )"
+# Detect and save the original protocol (http or https)
+if [[ "$local_original_siteurl" == https://* ]]; then
+    local_original_protocol="https://"
+elif [[ "$local_original_siteurl" == http://* ]]; then
+    local_original_protocol="http://"
+else
+    local_original_protocol="https://"  # default to https if protocol not detected
+fi
 local_original_domain=${local_original_siteurl#http://}
 local_original_domain=${local_original_domain#https://}
+
 
 # Options flags (don't change here, pass in arguments)
 exclude_wpconfig=1    # highly unlikely you want to change this
@@ -50,6 +59,7 @@ files_only=0          # don't do a database dump & import
 db_only=0             # don't do a files sync
 no_db_import=0        # don't run db import
 be_verbose=0          # be verbose
+all_tables=0          # use --all-tables flag for search-replace
 
 # Add default excludes for rsync
 excludes=(.wp-stats .maintenance .user.ini wp-content/cache)
@@ -246,6 +256,8 @@ cat <<EOF
         --no-db-import                      Do not run 'wp db import'
         --no-search-replace, --no-rewrite   Do not run 'wp search-replace'
         --tidy-up                           Delete database dump files in LOCAL and REMOTE
+        -e, --exclude 'path1 path2'         Additional paths to exclude from rsync (space-delimited, quoted)
+        -a, --all-tables                    Use --all-tables flag for wp search-replace commands
         -h, --help                          Show this help message
         -v, --verbose                       Be verbose
         Notes:
@@ -329,6 +341,22 @@ while [[ $# -gt 0 ]]; do
       shift;;
     --no-search-replace|--no-rewrite)
       do_search_replace=0
+      shift;;
+    --exclude|-e)
+      if [ -n "$2" ]; then
+        # Parse space-delimited list and add to excludes array
+        IFS=' ' read -ra ADDR <<< "$2"
+        for i in "${ADDR[@]}"; do
+          excludes+=("$i")
+        done
+        shift 2
+      else
+        echo "Error: --exclude requires a quoted argument" >&2
+        exit 1
+      fi
+      ;;
+    --all-tables|-a)
+      all_tables=1
       shift;;
     *)
       echo "Invalid option: $1" >&2
@@ -524,11 +552,18 @@ if (( files_only == 0 && no_db_import == 0 )); then
                 newline="-n"; format="count"
             fi
             
+            # Set --all-tables flag if requested
+            if (( all_tables == 1 )); then
+                all_tables_flag="--all-tables"
+            else
+                all_tables_flag=""
+            fi
+            
             # Replace URLs (domain names)
             status "Updating URLs in database..."
             echo -e ${newline} "${lh} ${clr_blue}Replacing URLs: //${remote_site_domain} → //${local_original_domain}${clr_reset}"
             if wp_quiet search-replace --precise "//${remote_site_domain}" "//${local_original_domain}" \
-                --path=$local_full_path --report-changed-only --format=${format}; then
+                --path=$local_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
                 success "URL replacement complete"
             else
                 warning "URL replacement may have encountered issues"
@@ -538,11 +573,18 @@ if (( files_only == 0 && no_db_import == 0 )); then
             status "Updating file paths in database..."
             echo -e ${newline} "${lh} ${clr_blue}Replacing paths: ${remote_full_path} → ${local_full_path}${clr_reset}"
             if wp_quiet search-replace --precise "${remote_full_path}" "${local_full_path}" \
-                --path=$local_full_path --report-changed-only --format=${format}; then
+                --path=$local_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
                 success "Path replacement complete"
             else
                 warning "Path replacement may have encountered issues"
             fi
+            
+            # Restore original protocol by updating siteurl and home options
+            status "Restoring original protocol..."
+            local final_url="${local_original_protocol}${local_original_domain}"
+            wp_quiet option update siteurl "$final_url" --path=$local_full_path 2>/dev/null
+            wp_quiet option update home "$final_url" --path=$local_full_path 2>/dev/null
+            success "Protocol restored to: ${local_original_protocol}"
             
             # Flush cache after search-replace
             wp_quiet cache flush --hard --path=$local_full_path 2>/dev/null
