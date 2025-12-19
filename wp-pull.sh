@@ -136,24 +136,16 @@ db_dump_sql="${db_export_prefix}${rnd_str}${rnd_str_handle}.sql"
 # Execute wp-cli commands as REMOTE user
 # Suppresses stderr to avoid noisy permission/warning messages
 function sudo_as_remote_user() {
-    if (( be_verbose == 1 )); then
-        # In verbose mode, show all output
-        sudo -u $remote_user "$@"
-    else
-        # In normal mode, suppress stderr noise from wp-cli
-        sudo -u $remote_user "$@" 2>/dev/null
-    fi
+    # Always suppress stderr to prevent PHP notices/warnings from cluttering output
+    # Verbose mode only affects script-level messages, not wp-cli debug output
+    sudo -u $remote_user "$@" 2>/dev/null
 }
 
 # Execute wp-cli commands as LOCAL user with error suppression
 function wp_quiet() {
-    if (( be_verbose == 1 )); then
-        # In verbose mode, show all output
-        wp "$@"
-    else
-        # In normal mode, suppress stderr noise from wp-cli
-        wp "$@" 2>/dev/null
-    fi
+    # Always suppress stderr to prevent PHP notices/warnings from cluttering output
+    # Verbose mode only affects script-level messages, not wp-cli debug output
+    wp "$@" 2>/dev/null
 }
 
 # Check if a command exists
