@@ -45,6 +45,14 @@ remote_full_path="${remote_path}${remote_webroot}"
 remote_original_siteurl="$( sudo -u $remote_user wp option get siteurl --path=$remote_full_path )"
 remote_original_domain=${remote_original_siteurl#http://}
 remote_original_domain=${remote_original_domain#https://}
+# Detect and save the original REMOTE protocol (http or https)
+if [[ "$remote_original_siteurl" == https://* ]]; then
+    remote_original_protocol="https://"
+elif [[ "$remote_original_siteurl" == http://* ]]; then
+    remote_original_protocol="http://"
+else
+    remote_original_protocol="https://"  # default to https if protocol not detected
+fi
 
 # Options flags (don't change here, pass in arguments)
 exclude_wpconfig=1    # highly unlikely you want to change this
@@ -53,6 +61,7 @@ files_only=0          # don't do a database dump & import
 db_only=0             # don't do a files sync
 no_db_import=0        # don't run db import
 be_verbose=0          # be verbose
+all_tables=0          # run search-replace with --all-tables
 
 # Add default excludes for rsync
 excludes=(.wp-stats .maintenance .user.ini wp-content/cache)
@@ -129,24 +138,16 @@ db_dump_sql="${db_export_prefix}${rnd_str}${rnd_str_handle}.sql"
 # Execute wp-cli commands as REMOTE user
 # Suppresses stderr to avoid noisy permission/warning messages
 function sudo_as_remote_user() {
-    if (( be_verbose == 1 )); then
-        # In verbose mode, show all output
-        sudo -u $remote_user "$@"
-    else
-        # In normal mode, suppress stderr noise from wp-cli
-        sudo -u $remote_user "$@" 2>/dev/null
-    fi
+    # Always suppress stderr to prevent PHP notices/warnings from cluttering output
+    # Verbose mode only affects script-level messages, not wp-cli debug output
+    sudo -u $remote_user "$@" 2>/dev/null
 }
 
 # Execute wp-cli commands as LOCAL user with error suppression
 function wp_quiet() {
-    if (( be_verbose == 1 )); then
-        # In verbose mode, show all output
-        wp "$@"
-    else
-        # In normal mode, suppress stderr noise from wp-cli
-        wp "$@" 2>/dev/null
-    fi
+    # Always suppress stderr to prevent PHP notices/warnings from cluttering output
+    # Verbose mode only affects script-level messages, not wp-cli debug output
+    wp "$@" 2>/dev/null
 }
 
 # Check if a command exists
@@ -195,6 +196,15 @@ function fetch_site_info() {
     local_db_name="$( wp_quiet config get DB_NAME --path=$local_full_path )"
     local_db_prefix="$( wp_quiet db prefix --path=$local_full_path )"
     
+    # Detect LOCAL protocol
+    if [[ "$local_siteurl" == https://* ]]; then
+        local_protocol="https://"
+    elif [[ "$local_siteurl" == http://* ]]; then
+        local_protocol="http://"
+    else
+        local_protocol="https://"  # default to https
+    fi
+    
     # Extract domain from URL (remove http:// or https://)
     local_site_domain="${local_siteurl#http://}"
     local_site_domain="${local_site_domain#https://}"
@@ -209,6 +219,15 @@ function fetch_site_info() {
     remote_blogname="$( sudo_as_remote_user wp option get blogname --path=$remote_full_path )"
     remote_db_name="$( sudo_as_remote_user wp config get DB_NAME --path=$remote_full_path )"
     remote_db_prefix="$( sudo_as_remote_user wp db prefix --path=$remote_full_path )"
+    
+    # Detect REMOTE protocol
+    if [[ "$remote_siteurl" == https://* ]]; then
+        remote_protocol="https://"
+    elif [[ "$remote_siteurl" == http://* ]]; then
+        remote_protocol="http://"
+    else
+        remote_protocol="https://"  # default to https
+    fi
     
     # Extract domain from URL
     remote_site_domain="${remote_siteurl#http://}"
@@ -248,6 +267,8 @@ cat <<EOF
         --files-only                        Do not push the database, only the files
         --no-db-import                      Do not run 'wp db import'
         --no-search-replace, --no-rewrite   Do not run 'wp search-replace'
+        --exclude, -e PATH              Exclude additional paths from rsync (space-delimited, quoted)
+        --all-tables, -a                Run search-replace with --all-tables flag
         --tidy-up                           Delete database dump files in LOCAL and REMOTE
         -h, --help                          Show this help message
         -v, --verbose                       Be verbose
@@ -529,24 +550,54 @@ if (( files_only == 0 && no_db_import == 0 )); then
                 newline="-n"; format="count"
             fi
             
-            # Replace URLs (domain names)
-            status "Updating URLs in database..."
-            echo -e ${newline} "${lh} ${clr_blue}Replacing URLs: //${local_site_domain} → //${remote_original_domain}${clr_reset}"
-            if sudo_as_remote_user wp search-replace --precise "//${local_site_domain}" "//${remote_original_domain}" \
-                --path=$remote_full_path --report-changed-only --format=${format}; then
-                success "URL replacement complete"
+            # Set --all-tables flag if requested
+            if (( all_tables == 1 )); then
+                all_tables_flag="--all-tables"
             else
-                warning "URL replacement may have encountered issues"
+                all_tables_flag=""
+            fi
+            
+            # Replace URLs (domain names)
+            # Check if protocols differ between LOCAL and REMOTE
+            if [[ "$local_protocol" != "$remote_original_protocol" ]]; then
+                # Protocols differ - must include protocol in search-replace
+                status "Updating URLs in database (with protocol conversion)..."
+                echo -e ${newline} "${lh} ${clr_blue}Replacing URLs: ${local_protocol}${local_site_domain} → ${remote_original_protocol}${remote_site_domain}${clr_reset}"
+                if sudo_as_remote_user wp search-replace --precise "${local_protocol}${local_site_domain}" "${remote_original_protocol}${remote_site_domain}" \
+                    --path=$remote_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
+                    success "URL replacement complete (protocol converted)"
+                else
+                    warning "URL replacement may have encountered issues"
+                fi
+            else
+                # Protocols are the same - use protocol-relative search-replace
+                status "Updating URLs in database..."
+                echo -e ${newline} "${lh} ${clr_blue}Replacing URLs: //${local_site_domain} → //${remote_site_domain}${clr_reset}"
+                if sudo_as_remote_user wp search-replace --precise "//${local_site_domain}" "//${remote_site_domain}" \
+                    --path=$remote_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
+                    success "URL replacement complete"
+                else
+                    warning "URL replacement may have encountered issues"
+                fi
             fi
             
             # Replace file paths
             status "Updating file paths in database..."
             echo -e ${newline} "${lh} ${clr_blue}Replacing paths: ${local_full_path} → ${remote_full_path}${clr_reset}"
             if sudo_as_remote_user wp search-replace --precise "${local_full_path}" "${remote_full_path}" \
-                --path=$remote_full_path --report-changed-only --format=${format}; then
+                --path=$remote_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
                 success "Path replacement complete"
             else
                 warning "Path replacement may have encountered issues"
+            fi
+            
+            # Verify final URLs are correct
+            if [[ "$local_protocol" != "$remote_original_protocol" ]]; then
+                # Double-check siteurl and home have correct protocol after conversion
+                final_url="${remote_original_protocol}${remote_site_domain}"
+                sudo_as_remote_user wp option update siteurl "$final_url" --path=$remote_full_path 2>/dev/null
+                sudo_as_remote_user wp option update home "$final_url" --path=$remote_full_path 2>/dev/null
+                info "Protocol set to: ${remote_original_protocol}"
             fi
             
             # Flush cache after search-replace
