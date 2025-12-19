@@ -354,6 +354,22 @@ while [[ $# -gt 0 ]]; do
     --no-search-replace|--no-rewrite)
       do_search_replace=0
       shift;;
+    --exclude|-e)
+      if [ -n "$2" ]; then
+        # Parse space-delimited list and add to excludes array
+        IFS=' ' read -ra ADDR <<< "$2"
+        for i in "${ADDR[@]}"; do
+          excludes+=("$i")
+        done
+        shift 2
+      else
+        echo "Error: --exclude requires a quoted argument" >&2
+        exit 1
+      fi
+      ;;
+    --all-tables|-a)
+      all_tables=1
+      shift;;
     *)
       echo "Invalid option: $1" >&2
       exit 1
