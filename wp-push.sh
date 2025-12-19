@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.5.0.0"
+script_version="1.5.1.0"
 # Author:            gb@wpnet.nz
 # Description:       Push a WordPress site to another user on the same server
 # 
