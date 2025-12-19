@@ -213,6 +213,15 @@ function fetch_site_info() {
         exit 1
     fi
     
+    # Detect REMOTE protocol
+    if [[ "$remote_siteurl" == https://* ]]; then
+        remote_protocol="https://"
+    elif [[ "$remote_siteurl" == http://* ]]; then
+        remote_protocol="http://"
+    else
+        remote_protocol="https://"  # default to https
+    fi
+    
     remote_blogname="$( sudo_as_remote_user wp option get blogname --path=$remote_full_path )"
     remote_db_name="$( sudo_as_remote_user wp config get DB_NAME --path=$remote_full_path )"
     remote_db_prefix="$( sudo_as_remote_user wp db prefix --path=$remote_full_path )"
@@ -560,13 +569,27 @@ if (( files_only == 0 && no_db_import == 0 )); then
             fi
             
             # Replace URLs (domain names)
-            status "Updating URLs in database..."
-            echo -e ${newline} "${lh} ${clr_blue}Replacing URLs: //${remote_site_domain} → //${local_original_domain}${clr_reset}"
-            if wp_quiet search-replace --precise "//${remote_site_domain}" "//${local_original_domain}" \
-                --path=$local_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
-                success "URL replacement complete"
+            # Check if protocols differ between REMOTE and LOCAL
+            if [[ "$remote_protocol" != "$local_original_protocol" ]]; then
+                # Protocols differ - must include protocol in search-replace
+                status "Updating URLs in database (with protocol conversion)..."
+                echo -e ${newline} "${lh} ${clr_blue}Replacing URLs: ${remote_protocol}${remote_site_domain} → ${local_original_protocol}${local_site_domain}${clr_reset}"
+                if wp_quiet search-replace --precise "${remote_protocol}${remote_site_domain}" "${local_original_protocol}${local_site_domain}" \
+                    --path=$local_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
+                    success "URL replacement complete (protocol converted)"
+                else
+                    warning "URL replacement may have encountered issues"
+                fi
             else
-                warning "URL replacement may have encountered issues"
+                # Protocols are the same - use protocol-relative search-replace
+                status "Updating URLs in database..."
+                echo -e ${newline} "${lh} ${clr_blue}Replacing URLs: //${remote_site_domain} → //${local_site_domain}${clr_reset}"
+                if wp_quiet search-replace --precise "//${remote_site_domain}" "//${local_site_domain}" \
+                    --path=$local_full_path --report-changed-only --format=${format} ${all_tables_flag}; then
+                    success "URL replacement complete"
+                else
+                    warning "URL replacement may have encountered issues"
+                fi
             fi
             
             # Replace file paths
@@ -579,12 +602,14 @@ if (( files_only == 0 && no_db_import == 0 )); then
                 warning "Path replacement may have encountered issues"
             fi
             
-            # Restore original protocol by updating siteurl and home options
-            status "Restoring original protocol..."
-            final_url="${local_original_protocol}${local_site_domain}"
-            wp_quiet option update siteurl "$final_url" --path=$local_full_path 2>/dev/null
-            wp_quiet option update home "$final_url" --path=$local_full_path 2>/dev/null
-            success "Protocol restored to: ${local_original_protocol}"
+            # Verify final URLs are correct
+            if [[ "$remote_protocol" != "$local_original_protocol" ]]; then
+                # Double-check siteurl and home have correct protocol after conversion
+                final_url="${local_original_protocol}${local_site_domain}"
+                wp_quiet option update siteurl "$final_url" --path=$local_full_path 2>/dev/null
+                wp_quiet option update home "$final_url" --path=$local_full_path 2>/dev/null
+                info "Protocol set to: ${local_original_protocol}"
+            fi
             
             # Flush cache after search-replace
             wp_quiet cache flush --hard --path=$local_full_path 2>/dev/null
