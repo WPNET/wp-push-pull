@@ -581,7 +581,7 @@ if (( files_only == 0 && no_db_import == 0 )); then
             
             # Restore original protocol by updating siteurl and home options
             status "Restoring original protocol..."
-            local final_url="${local_original_protocol}${local_original_domain}"
+            final_url="${local_original_protocol}${local_site_domain}"
             wp_quiet option update siteurl "$final_url" --path=$local_full_path 2>/dev/null
             wp_quiet option update home "$final_url" --path=$local_full_path 2>/dev/null
             success "Protocol restored to: ${local_original_protocol}"
