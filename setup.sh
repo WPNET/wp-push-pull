@@ -10,6 +10,9 @@ script_version="1.3.0"
 #### Set up
 #######################################################
 
+# Get the directory where this script is located
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # installed filename
 install_name=""
 # Default webroot
@@ -358,7 +361,7 @@ if ( get_confirmation "Copy '${install_name}' script into '${local_path}${instal
 
     tmp_file=$(mktemp)
     echo "Creating temporary file: $tmp_file"
-    cat "./${install_name}.sh" > "$tmp_file"
+    cat "${script_dir}/${install_name}.sh" > "$tmp_file"
     # Use sed to set the configuration
     echo "Writing config to file ..."
     sed -i "/^local_user=/c\local_user=\"$local_user\"" "$tmp_file"
