@@ -1,6 +1,6 @@
 # WordPress Push/Pull Scripts
 
-A powerful and secure solution for copying WordPress sites between users on the same local server. Perfect for managing development, staging, and production environments on a single server.
+A BASH script for copying WordPress sites between users on the same server. Perfect for managing development, staging, and production environments on a single server.
 
 ## 📑 Table of Contents
 
