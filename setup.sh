@@ -49,19 +49,19 @@ fi
 
 # Helper functions for consistent output
 function success() {
-    echo -e "${clr_green}✓ $@${clr_reset}"
+    echo -e "${clr_green}✓ $*${clr_reset}"
 }
 
 function error() {
-    echo -e "${clr_red}✗ ERROR: $@${clr_reset}"
+    echo -e "${clr_red}✗ ERROR: $*${clr_reset}"
 }
 
 function warning() {
-    echo -e "${clr_yellow}⚠ WARNING: $@${clr_reset}"
+    echo -e "${clr_yellow}⚠ WARNING: $*${clr_reset}"
 }
 
 function info() {
-    echo -e "${clr_blue}ℹ $@${clr_reset}"
+    echo -e "${clr_blue}ℹ $*${clr_reset}"
 }
 
 # check a directory exists
@@ -359,9 +359,15 @@ fi
 #######################################################
 if ( get_confirmation "Copy '${install_name}' script into '${local_path}${install_dir}' ?" ); then
 
+    source_script="${script_dir}/${install_name}.sh"
+    if [ ! -f "$source_script" ]; then
+        error "Source script not found: $source_script"
+        exit 1
+    fi
+
     tmp_file=$(mktemp)
     echo "Creating temporary file: $tmp_file"
-    cat "${script_dir}/${install_name}.sh" > "$tmp_file"
+    cat "$source_script" > "$tmp_file"
     # Use sed to set the configuration
     echo "Writing config to file ..."
     sed -i "/^local_user=/c\local_user=\"$local_user\"" "$tmp_file"
@@ -370,10 +376,18 @@ if ( get_confirmation "Copy '${install_name}' script into '${local_path}${instal
     sed -i "/^remote_user=/c\remote_user=\"$remote_user\"" "$tmp_file"
     sed -i "/^remote_path=/c\remote_path=\"$remote_path\"" "$tmp_file"
     sed -i "/^remote_webroot=/c\remote_webroot=\"$remote_webroot\"" "$tmp_file"
-    echo "Install and set permissions" 
-    mv $tmp_file "${local_path}${install_dir}/${install_name}"
-    chown ${local_user}:${local_user} "${local_path}${install_dir}/${install_name}"
-    chmod 0700 "${local_path}${install_dir}/${install_name}"
+
+    # Ensure the install directory exists (created as the LOCAL user for correct ownership)
+    install_path="${local_path}${install_dir}"
+    if [ ! -d "$install_path" ]; then
+        echo "Creating install directory: $install_path"
+        sudo -u "$local_user" mkdir -p "$install_path"
+    fi
+
+    echo "Install and set permissions"
+    mv "$tmp_file" "${install_path}/${install_name}"
+    chown ${local_user}:${local_user} "${install_path}/${install_name}"
+    chmod 0700 "${install_path}/${install_name}"
     echo "Done! The user '${local_user}' can now login via SSH and run the '${install_name}' command."
 
 else

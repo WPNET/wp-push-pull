@@ -42,17 +42,6 @@ remote_webroot="" # no preceding or trailing slash
 # construct full paths
 local_full_path="${local_path}${local_webroot}"
 remote_full_path="${remote_path}${remote_webroot}"
-remote_original_siteurl="$( sudo -u $remote_user wp option get siteurl --path=$remote_full_path )"
-remote_original_domain=${remote_original_siteurl#http://}
-remote_original_domain=${remote_original_domain#https://}
-# Detect and save the original REMOTE protocol (http or https)
-if [[ "$remote_original_siteurl" == https://* ]]; then
-    remote_original_protocol="https://"
-elif [[ "$remote_original_siteurl" == http://* ]]; then
-    remote_original_protocol="http://"
-else
-    remote_original_protocol="https://"  # default to https if protocol not detected
-fi
 
 # Options flags (don't change here, pass in arguments)
 exclude_wpconfig=1    # highly unlikely you want to change this
@@ -97,32 +86,28 @@ lh="\n${clr_bold}"
 
 # Standard status message (cyan)
 function status() {
-    echo -e "${lh} ${clr_cyan}$@${clr_reset}"
+    echo -e "${lh} ${clr_cyan}$*${clr_reset}"
 }
 
 # Success message (green)
 function success() {
-    echo -e "${lh} ${clr_green}✓ $@${clr_reset}"
+    echo -e "${lh} ${clr_green}✓ $*${clr_reset}"
 }
 
 # Error message (red)
 function error() {
-    echo -e "${lh} ${clr_red}✗ ERROR: $@${clr_reset}"
+    echo -e "${lh} ${clr_red}✗ ERROR: $*${clr_reset}"
 }
 
 # Warning message (yellow)
 function warning() {
-    echo -e "${lh} ${clr_yellow}⚠ WARNING: $@${clr_reset}"
+    echo -e "${lh} ${clr_yellow}⚠ WARNING: $*${clr_reset}"
 }
 
 # Info message (blue)
 function info() {
-    echo -e "${lh} ${clr_blue}ℹ $@${clr_reset}"
+    echo -e "${lh} ${clr_blue}ℹ $*${clr_reset}"
 }
-
-# Set permissions for LOCAL user to access REMOTE user's path
-# This allows LOCAL user to write files to REMOTE user's directory
-sudo /usr/bin/setfacl -m u:${local_user}:rwX ${remote_path}
 
 # Generate unique filename for database dumps
 # The random string helps avoid collisions and the handle helps with cleanup
@@ -233,6 +218,9 @@ function fetch_site_info() {
     remote_site_domain="${remote_siteurl#http://}"
     remote_site_domain="${remote_site_domain#https://}"
 
+    # Preserve the REMOTE site's original protocol (captured before any changes)
+    remote_original_protocol="$remote_protocol"
+
 }
 
 # Print summary
@@ -311,7 +299,7 @@ tidy_up_db_dumps() {
 
     # Confirm deletion if files found
     if [ -n "$local_files" ] || [ -n "$remote_files" ]; then
-        if $(get_confirmation "DELETE ALL found database dump files?"); then
+        if get_confirmation "DELETE ALL found database dump files?"; then
             status "Deleting database dump files..."
             
             # Delete LOCAL files
@@ -404,7 +392,17 @@ if [ ! -d "$local_full_path" ]; then
     exit 1
 fi
 
-# Verify REMOTE path exists
+# Grant LOCAL user temporary access to the REMOTE path.
+# Registered with an EXIT trap so the ACL is always revoked, even on early
+# failure or cancellation (never leave elevated permissions in place).
+remove_temp_acl() {
+    (( be_verbose == 1 )) && info "Removing temporary file access permissions..."
+    sudo /usr/bin/setfacl -x u:${local_user} ${remote_path} 2>/dev/null
+}
+trap remove_temp_acl EXIT
+sudo /usr/bin/setfacl -m u:${local_user}:rwX ${remote_path}
+
+# Verify REMOTE path exists (requires the ACL granted above)
 if [ ! -d "$remote_full_path" ]; then
     error "REMOTE path does not exist: $remote_full_path"
     exit 1
@@ -415,11 +413,13 @@ fetch_site_info
 
 # Display operation banner
 echo -e "${clr_bold}${clr_cyan}═══════════════════════════════════════════════════════════════${clr_reset}"
-status "WordPress Site PUSH Operation"
+status "▲  WordPress Site PUSH Operation"
 echo -e "${clr_bold}${clr_cyan}═══════════════════════════════════════════════════════════════${clr_reset}"
 warning "PUSH requires elevated privileges - USE WITH CAUTION!"
-info "FROM: ${local_user}@${local_full_path}"
-info "TO:   ${remote_user}@${remote_full_path}"
+echo ""
+echo -e "  ${clr_bold}${clr_cyan}FROM${clr_reset}  ${local_user}@${local_full_path}"
+echo -e "   ${clr_cyan}↓${clr_reset}"
+echo -e "  ${clr_bold}${clr_cyan}TO${clr_reset}    ${remote_user}@${remote_full_path}"
 (( be_verbose == 1 )) && echo "Script: $0 v${script_version}"
 
 # Print detailed summary in verbose mode
@@ -639,9 +639,7 @@ fi
 # Cleanup and completion
 ####################################################################################
 
-# Remove temporary elevated permissions
-(( be_verbose == 1 )) && info "Removing temporary file access permissions..."
-sudo /usr/bin/setfacl -x u:${local_user} ${remote_path} 2>/dev/null
+# Temporary elevated permissions are revoked automatically via the EXIT trap.
 
 # Display completion message
 echo ""
