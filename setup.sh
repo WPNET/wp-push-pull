@@ -57,7 +57,7 @@ function error() {
 }
 
 function warning() {
-    echo -e "${clr_yellow}⚠ WARNING: $*${clr_reset}"
+    echo -e "${clr_yellow}⚠  WARNING: $*${clr_reset}"
 }
 
 function info() {

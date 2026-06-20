@@ -101,7 +101,7 @@ function error() {
 
 # Warning message (yellow)
 function warning() {
-    echo -e "${lh} ${clr_yellow}⚠ WARNING: $*${clr_reset}"
+    echo -e "${lh} ${clr_yellow}⚠  WARNING: $*${clr_reset}"
 }
 
 # Info message (blue)
