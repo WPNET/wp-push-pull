@@ -59,7 +59,7 @@ files_only=0          # don't do a database dump & import
 db_only=0             # don't do a files sync
 no_db_import=0        # don't run db import
 be_verbose=0          # be verbose
-all_tables_with_prefix=0          # use --all-tables-with-prefix flag for search-replace
+all_tables_with_prefix=1          # use --all-tables-with-prefix flag for search-replace by default
 
 # Add default excludes for rsync
 excludes=(.wp-stats .maintenance .user.ini wp-content/cache)
@@ -258,7 +258,8 @@ cat <<EOF
         --no-search-replace, --no-rewrite   Do not run 'wp search-replace'
         --tidy-up                           Delete database dump files in LOCAL and REMOTE
         -e, --exclude 'path1 path2'         Additional paths to exclude from rsync (space-delimited, quoted)
-        -a, --all-tables-with-prefix        Use --all-tables-with-prefix flag for wp search-replace commands
+        -a, --all-tables-with-prefix        Use --all-tables-with-prefix flag for wp search-replace commands (default)
+        --no-all-tables-with-prefix         Do not use --all-tables-with-prefix flag for wp search-replace commands
         -h, --help                          Show this help message
         -v, --verbose                       Be verbose
         Notes:
@@ -358,6 +359,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --all-tables-with-prefix|-a)
       all_tables_with_prefix=1
+      shift;;
+    --no-all-tables-with-prefix)
+      all_tables_with_prefix=0
       shift;;
     *)
       echo "Invalid option: $1" >&2
@@ -553,7 +557,7 @@ if (( files_only == 0 && no_db_import == 0 )); then
                 newline="-n"; format="count"
             fi
             
-            # Set --all-tables-with-prefix flag if requested
+            # Default to including all tables with the current prefix unless bypassed
             if (( all_tables_with_prefix == 1 )); then
                 all_tables_with_prefix_flag="--all-tables-with-prefix"
             else

@@ -162,7 +162,8 @@ Options:
   --no-search-replace, --no-rewrite   Skip URL/path replacement in database
   --tidy-up                           Clean up old database dump files
   -e, --exclude 'path1 path2'         Additional paths to exclude from rsync (space-delimited, quoted)
-  -a, --all-tables-with-prefix        Use --all-tables-with-prefix flag for wp search-replace commands
+  -a, --all-tables-with-prefix        Use --all-tables-with-prefix flag for wp search-replace commands (default)
+  --no-all-tables-with-prefix         Disable --all-tables-with-prefix for wp search-replace commands
   -h, --help                          Show help message
   -v, --verbose                       Enable verbose output
 ```
@@ -179,8 +180,8 @@ wp-pull --db-only
 # Files only
 wp-pull --files-only
 
-# With custom table support
-wp-pull --all-tables-with-prefix
+# Disable custom table support
+wp-pull --no-all-tables-with-prefix
 
 # Exclude specific directories
 wp-pull --exclude 'wp-content/uploads/cache wp-content/backups'
@@ -201,7 +202,7 @@ Automatically handles http/https differences between LOCAL and REMOTE sites, con
 Detects and resolves database table prefix mismatches (e.g., `wp_` vs `wpmu_`) with guided workflow and safety confirmations.
 
 ### Custom Table Support
-Use `--all-tables-with-prefix` to include custom database tables created by plugins in search-replace operations.
+Search-replace includes custom database tables created by plugins by default. Use `--no-all-tables-with-prefix` to revert to prefix-only table matching.
 
 ### File Exclusions
 Default exclusions: `.wp-stats`, `.maintenance`, `.user.ini`, `wp-content/cache`, `wp-config.php`
