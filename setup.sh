@@ -61,7 +61,7 @@ function warning() {
 }
 
 function info() {
-    echo -e "${clr_blue}ℹ $*${clr_reset}"
+    echo -e "${clr_blue}ℹ  $*${clr_reset}"
 }
 
 # check a directory exists

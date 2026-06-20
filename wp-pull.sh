@@ -104,7 +104,7 @@ function warning() {
 
 # Info message (blue)
 function info() {
-    echo -e "${lh} ${clr_blue}ℹ $*${clr_reset}"
+    echo -e "${lh} ${clr_blue}ℹ  $*${clr_reset}"
 }
 
 # Generate unique filename for database dumps
