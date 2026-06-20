@@ -334,9 +334,10 @@ if [ ! -f "$sudoers_file" ]; then
 else
 
     echo -e "\nSudoers file already exists."
-    if ( get_confirmation "Display existing sudoers file?" ); then
-        cat $sudoers_file
-    fi
+    read -p "$(echo -e "\\n${clr_bold}${clr_yellow}VIEW:${clr_reset} Type ${clr_bold}v${clr_reset} then ${clr_bold}[enter]${clr_reset} to view the existing sudoers file, or just ${clr_bold}[enter]${clr_reset} to continue: ")" view_input
+    case "$view_input" in
+        [Vv]* ) cat "$sudoers_file";;
+    esac
     if ( ! get_confirmation "Keep existing sudoers file?" ); then
         rm -v "$sudoers_file"
         echo "Checking sudo syntax with visudo ..."
